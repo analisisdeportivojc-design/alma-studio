@@ -1,24 +1,26 @@
+import Image from "next/image";
+
 const niveles = [
   {
     nombre: "Alma Foundation",
     subtitulo: "¡Tu punto de inicio!",
     descripcion:
       "Clase diseñada para principiantes o para quienes desean reconectar con su cuerpo desde la base. Trabajamos la alineación, respiración, control y conciencia postural, fortaleciendo tu core y construyendo la técnica esencial del método Pilates.",
-    color: "bg-alma-cream",
+    imagen: "/foundation.webp",
   },
   {
     nombre: "Alma Flow",
     subtitulo: "Secuencias fluidas y continuas",
     descripcion:
       "Combina secuencias fluidas y continuas que conectan respiración, fuerza y flexibilidad. Perfecta para quienes buscan energía, equilibrio y una práctica que revitaliza cuerpo y mente.",
-    color: "bg-alma-light",
+    imagen: "/flow.webp",
   },
   {
     nombre: "Alma Strength",
     subtitulo: "Control, fuerza y precisión",
     descripcion:
       "Una clase que integra ejercicios de control, fuerza y precisión, trabajando desde el core hacia todo el cuerpo. Ideal para quienes desean retarse, fortalecer y elevar su práctica con movimientos dinámicos, seguros y conscientes.",
-    color: "bg-alma-cream",
+    imagen: "/strength.webp",
   },
 ];
 
@@ -37,12 +39,23 @@ export default function Niveles() {
           {niveles.map((n, i) => (
             <div
               key={n.nombre}
-              className={`${n.color} p-10 rounded-2xl relative overflow-hidden`}
+              className="bg-white rounded-2xl overflow-hidden group"
             >
-              <div className="text-alma-warm/30 font-[family-name:var(--font-playfair)] text-8xl absolute -top-4 -right-2 select-none">
-                {i + 1}
+              <div className="relative h-64 overflow-hidden">
+                <Image
+                  src={n.imagen}
+                  alt={n.nombre}
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                <div className="absolute bottom-4 left-6">
+                  <span className="text-white/60 font-[family-name:var(--font-playfair)] text-5xl">
+                    {i + 1}
+                  </span>
+                </div>
               </div>
-              <div className="relative">
+              <div className="p-8">
                 <h3 className="font-[family-name:var(--font-playfair)] text-2xl text-alma-dark mb-2">
                   {n.nombre}
                 </h3>
