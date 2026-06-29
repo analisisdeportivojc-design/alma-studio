@@ -2,24 +2,24 @@ import Image from "next/image";
 
 const niveles = [
   {
-    nombre: "Alma Foundation",
-    subtitulo: "¡Tu punto de inicio!",
+    nombre: "Foundation",
+    subtitulo: "Tu punto de inicio",
     descripcion:
-      "Clase diseñada para principiantes o para quienes desean reconectar con su cuerpo desde la base. Trabajamos la alineación, respiración, control y conciencia postural, fortaleciendo tu core y construyendo la técnica esencial del método Pilates.",
+      "Para principiantes o quienes desean reconectar con su cuerpo desde la base. Alineación, respiración, control y conciencia postural.",
     imagen: "/foundation.webp",
   },
   {
-    nombre: "Alma Flow",
-    subtitulo: "Secuencias fluidas y continuas",
+    nombre: "Flow",
+    subtitulo: "Secuencias fluidas",
     descripcion:
-      "Combina secuencias fluidas y continuas que conectan respiración, fuerza y flexibilidad. Perfecta para quienes buscan energía, equilibrio y una práctica que revitaliza cuerpo y mente.",
+      "Secuencias continuas que conectan respiración, fuerza y flexibilidad. Energía, equilibrio y una práctica que revitaliza.",
     imagen: "/flow.webp",
   },
   {
-    nombre: "Alma Strength",
-    subtitulo: "Control, fuerza y precisión",
+    nombre: "Strength",
+    subtitulo: "Fuerza y precisión",
     descripcion:
-      "Una clase que integra ejercicios de control, fuerza y precisión, trabajando desde el core hacia todo el cuerpo. Ideal para quienes desean retarse, fortalecer y elevar su práctica con movimientos dinámicos, seguros y conscientes.",
+      "Control, fuerza y precisión desde el core. Para quienes desean retarse y elevar su práctica con movimientos dinámicos.",
     imagen: "/strength.webp",
   },
 ];
@@ -28,41 +28,34 @@ export default function Niveles() {
   return (
     <section className="py-24 bg-alma-light">
       <div className="max-w-7xl mx-auto px-6">
-        <p className="text-xs tracking-[0.3em] text-alma-warm text-center mb-4 uppercase">
-          Niveles
+        <p className="text-alma-warm text-xs tracking-[0.3em] mb-4 uppercase text-center">
+          Tu camino
         </p>
-        <h2 className="font-[family-name:var(--font-playfair)] text-4xl md:text-5xl text-center text-alma-dark mb-16">
-          Tu camino en Alma
+        <h2 className="font-[family-name:var(--font-playfair)] text-4xl md:text-5xl text-center text-alma-dark mb-16 uppercase">
+          Niveles
         </h2>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-6">
           {niveles.map((n, i) => (
-            <div
-              key={n.nombre}
-              className="bg-white rounded-2xl overflow-hidden group"
-            >
-              <div className="relative h-64 overflow-hidden">
+            <div key={n.nombre} className="group relative overflow-hidden rounded-lg cursor-pointer">
+              <div className="relative h-[500px]">
                 <Image
                   src={n.imagen}
                   alt={n.nombre}
                   fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="object-cover group-hover:scale-105 transition-transform duration-700"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                <div className="absolute bottom-4 left-6">
-                  <span className="text-white/60 font-[family-name:var(--font-playfair)] text-5xl">
-                    {i + 1}
-                  </span>
-                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
               </div>
-              <div className="p-8">
-                <h3 className="font-[family-name:var(--font-playfair)] text-2xl text-alma-dark mb-2">
+              <div className="absolute bottom-0 left-0 right-0 p-8">
+                <p className="text-alma-warm text-xs tracking-[0.2em] mb-2 uppercase">
+                  Nivel {String(i + 1).padStart(2, "0")}
+                </p>
+                <h3 className="font-[family-name:var(--font-playfair)] text-3xl text-white mb-2 uppercase">
                   {n.nombre}
                 </h3>
-                <p className="text-alma-gold text-sm font-bold mb-4">
-                  {n.subtitulo}
-                </p>
-                <p className="text-stone-500 leading-relaxed text-sm">
+                <p className="text-white/60 text-sm mb-3">{n.subtitulo}</p>
+                <p className="text-white/50 text-sm leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity duration-500 max-h-0 group-hover:max-h-40 overflow-hidden">
                   {n.descripcion}
                 </p>
               </div>

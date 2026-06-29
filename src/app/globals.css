@@ -6,6 +6,7 @@
   --alma-dark: #3d3d3d;
   --alma-gold: #b8956a;
   --alma-light: #faf8f5;
+  --alma-deep: #2a2522;
 }
 
 @theme inline {
@@ -14,8 +15,31 @@
   --color-alma-dark: var(--alma-dark);
   --color-alma-gold: var(--alma-gold);
   --color-alma-light: var(--alma-light);
+  --color-alma-deep: var(--alma-deep);
 }
 
 html {
   scroll-behavior: smooth;
 }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.8s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 1s ease-out forwards;
+}
+
+.animate-delay-200 { animation-delay: 200ms; }
+.animate-delay-400 { animation-delay: 400ms; }
+.animate-delay-600 { animation-delay: 600ms; }
