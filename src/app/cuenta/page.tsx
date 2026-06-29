@@ -1,12 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getUserRole, canAccessAdmin } from "@/lib/auth";
 
 export default async function CuentaPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, role } = await getUserRole();
 
   if (!user) {
     redirect("/login");
@@ -14,6 +11,7 @@ export default async function CuentaPage() {
 
   const firstName = user.user_metadata?.first_name || "Usuario";
   const lastName = user.user_metadata?.last_name || "";
+  const isAdmin = canAccessAdmin(role);
 
   return (
     <div className="min-h-screen bg-alma-light">
@@ -25,7 +23,15 @@ export default async function CuentaPage() {
           >
             Alma Studio
           </Link>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="bg-alma-dark text-white text-xs tracking-wider px-5 py-2 hover:bg-alma-deep transition-colors"
+              >
+                PANEL ADMIN
+              </Link>
+            )}
             <span className="text-sm text-stone-500">
               Hola, {firstName}
             </span>
