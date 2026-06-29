@@ -7,8 +7,8 @@ import { X } from "lucide-react";
 const navLinks = [
   { href: "#disciplinas", label: "Disciplinas" },
   { href: "#metodo", label: "El Método" },
+  { href: "#instructoras", label: "Instructoras" },
   { href: "#paquetes", label: "Paquetes" },
-  { href: "#horarios", label: "Horarios" },
   { href: "#contacto", label: "Contacto" },
 ];
 
