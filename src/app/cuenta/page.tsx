@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getUserRole, canAccessAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Calendar, Star, User, Clock, ChevronRight, Gift } from "lucide-react";
+import AplicarReferido from "@/components/AplicarReferido";
 
 async function getClientData(userId: string, businessId: string) {
   const supabase = await createClient();
@@ -56,6 +57,13 @@ async function getClientData(userId: string, businessId: string) {
     .order("created_at", { ascending: false })
     .limit(5);
 
+  const { data: wasReferred } = await supabase
+    .from("referrals")
+    .select("id")
+    .eq("referred_id", userId)
+    .eq("business_id", businessId)
+    .single();
+
   return {
     subscriptions: subscriptions.data || [],
     upcomingBookings: upcomingBookings.data || [],
@@ -64,6 +72,7 @@ async function getClientData(userId: string, businessId: string) {
     referralCode: profile?.referral_code || null,
     referrals: myReferrals || [],
     totalReferrals: myReferrals?.filter((r) => r.status === "completed" || r.status === "rewarded").length || 0,
+    wasReferred: !!wasReferred,
   };
 }
 
@@ -80,7 +89,7 @@ export default async function CuentaPage() {
 
   const clientData = businessId
     ? await getClientData(user.id, businessId)
-    : { subscriptions: [], upcomingBookings: [], pastBookings: [], totalAttended: 0, referralCode: null, referrals: [], totalReferrals: 0 };
+    : { subscriptions: [], upcomingBookings: [], pastBookings: [], totalAttended: 0, referralCode: null, referrals: [], totalReferrals: 0, wasReferred: false };
 
   const activeSub = clientData.subscriptions[0];
 
@@ -395,6 +404,7 @@ export default async function CuentaPage() {
                   ))}
                 </div>
               )}
+              {!clientData.wasReferred && <AplicarReferido />}
             </div>
           </div>
 
