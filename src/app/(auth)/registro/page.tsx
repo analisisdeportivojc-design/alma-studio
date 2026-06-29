@@ -52,6 +52,9 @@ export default function RegistroPage() {
       return;
     }
 
+    // Send welcome email (non-blocking)
+    fetch("/api/notifications/welcome", { method: "POST" }).catch(() => {});
+
     setSuccess(true);
   }
 

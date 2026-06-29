@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isValidUUID, isValidDate } from "@/lib/validation";
 import { rateLimit } from "@/lib/rate-limit";
+import { sendEmail } from "@/lib/email/send";
+import { bookingConfirmedEmail } from "@/lib/email/templates";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -161,6 +163,26 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Send confirmation email (non-blocking)
+  if (user.email) {
+    const firstName = user.user_metadata?.first_name || "Alumna";
+    const { data: classDetail } = await supabase
+      .from("classes")
+      .select("name, start_time")
+      .eq("id", class_id)
+      .single();
+
+    if (classDetail) {
+      const template = bookingConfirmedEmail(
+        firstName,
+        classDetail.name,
+        date,
+        classDetail.start_time?.slice(0, 5) || "",
+      );
+      sendEmail(user.email, template.subject, template.html).catch(() => {});
+    }
   }
 
   return NextResponse.json({ booking, message: "¡Clase reservada!" });

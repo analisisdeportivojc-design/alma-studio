@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isValidUUID } from "@/lib/validation";
 import { rateLimit } from "@/lib/rate-limit";
+import { sendEmail } from "@/lib/email/send";
+import { paymentConfirmedEmail } from "@/lib/email/templates";
 
 const VALID_METHODS = ["card", "transfer", "cash"];
 
@@ -121,6 +123,19 @@ export async function POST(request: Request) {
     },
     { onConflict: "user_id,business_id", ignoreDuplicates: true }
   );
+
+  // Send payment confirmation email (non-blocking)
+  if (user.email && payment.status === "completed") {
+    const firstName = user.user_metadata?.first_name || "Alumna";
+    const template = paymentConfirmedEmail(
+      firstName,
+      pkg.name,
+      pkg.price,
+      pkg.total_classes,
+      endDate.toLocaleDateString("es-PE")
+    );
+    sendEmail(user.email, template.subject, template.html).catch(() => {});
+  }
 
   return NextResponse.json({
     subscription_id: subscription.id,
