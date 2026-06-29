@@ -45,9 +45,9 @@ export default function Footer() {
             &copy; {new Date().getFullYear()} Alma Studio — Todos los derechos reservados.
           </p>
           <div className="flex gap-6">
-            <a href="#" className="text-stone-600 text-xs hover:text-white transition-colors">Términos y condiciones</a>
-            <a href="#" className="text-stone-600 text-xs hover:text-white transition-colors">Política de privacidad</a>
-            <a href="#" className="text-stone-600 text-xs hover:text-white transition-colors">Libro de reclamaciones</a>
+            <a href="/legal/terminos" className="text-stone-600 text-xs hover:text-white transition-colors">Términos y condiciones</a>
+            <a href="/legal/privacidad" className="text-stone-600 text-xs hover:text-white transition-colors">Política de privacidad</a>
+            <a href="/legal/libro-reclamaciones" className="text-stone-600 text-xs hover:text-white transition-colors">Libro de reclamaciones</a>
           </div>
         </div>
       </div>
