@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -17,7 +17,7 @@ interface PackageData {
   freeze_days: number;
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const searchParams = useSearchParams();
   const packageId = searchParams.get("paquete");
 
@@ -299,5 +299,19 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-alma-light flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-alma-warm border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }
