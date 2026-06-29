@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isValidUUID, isValidDate } from "@/lib/validation";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -12,11 +14,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const { class_id, date } = await request.json();
-
-  if (!class_id || !date) {
+  const { allowed } = rateLimit(`booking:${user.id}`, 20, 60_000);
+  if (!allowed) {
     return NextResponse.json(
-      { error: "class_id y date son requeridos" },
+      { error: "Demasiadas solicitudes. Intenta en un minuto." },
+      { status: 429 }
+    );
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const { class_id, date } = body;
+
+  if (!class_id || !date || !isValidUUID(class_id) || !isValidDate(date)) {
+    return NextResponse.json(
+      { error: "Datos inválidos" },
       { status: 400 }
     );
   }
@@ -160,7 +177,18 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const { booking_id } = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const { booking_id } = body;
+
+  if (!booking_id || !isValidUUID(booking_id)) {
+    return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+  }
 
   const { error } = await supabase
     .from("bookings")

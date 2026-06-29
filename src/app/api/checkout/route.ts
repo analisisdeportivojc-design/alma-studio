@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isValidUUID } from "@/lib/validation";
+import { rateLimit } from "@/lib/rate-limit";
+
+const VALID_METHODS = ["card", "transfer", "cash"];
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -12,11 +16,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const { package_id, payment_method } = await request.json();
-
-  if (!package_id) {
+  const { allowed } = rateLimit(`checkout:${user.id}`, 5, 60_000);
+  if (!allowed) {
     return NextResponse.json(
-      { error: "package_id requerido" },
+      { error: "Demasiadas solicitudes. Intenta en un minuto." },
+      { status: 429 }
+    );
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const { package_id, payment_method } = body;
+
+  if (!package_id || !isValidUUID(package_id)) {
+    return NextResponse.json(
+      { error: "Datos inválidos" },
+      { status: 400 }
+    );
+  }
+
+  if (payment_method && !VALID_METHODS.includes(payment_method)) {
+    return NextResponse.json(
+      { error: "Método de pago inválido" },
       { status: 400 }
     );
   }
