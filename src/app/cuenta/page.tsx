@@ -80,7 +80,7 @@ export default async function CuentaPage() {
 
   const clientData = businessId
     ? await getClientData(user.id, businessId)
-    : { subscriptions: [], upcomingBookings: [], pastBookings: [], totalAttended: 0 };
+    : { subscriptions: [], upcomingBookings: [], pastBookings: [], totalAttended: 0, referralCode: null, referrals: [], totalReferrals: 0 };
 
   const activeSub = clientData.subscriptions[0];
 
