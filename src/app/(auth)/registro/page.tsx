@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function RegistroPage() {
+function RegistroContent() {
+  const searchParams = useSearchParams();
+  const refCode = searchParams.get("ref") || "";
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState(refCode);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -54,6 +58,15 @@ export default function RegistroPage() {
 
     // Send welcome email (non-blocking)
     fetch("/api/notifications/welcome", { method: "POST" }).catch(() => {});
+
+    // Apply referral code if provided
+    if (referralCode.trim()) {
+      fetch("/api/referrals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: referralCode.trim() }),
+      }).catch(() => {});
+    }
 
     setSuccess(true);
   }
@@ -194,6 +207,28 @@ export default function RegistroPage() {
             />
           </div>
 
+          <div>
+            <label
+              htmlFor="referral"
+              className="block text-xs tracking-wider text-stone-500 mb-2 uppercase"
+            >
+              Código de referido <span className="text-stone-300">(opcional)</span>
+            </label>
+            <input
+              id="referral"
+              type="text"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+              className="w-full px-4 py-3 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-alma-gold transition-colors"
+              placeholder="Ej: MARI1234"
+            />
+            {referralCode && (
+              <p className="text-xs text-alma-gold mt-1">
+                ¡Ambas ganarán 1 clase gratis!
+              </p>
+            )}
+          </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -223,5 +258,19 @@ export default function RegistroPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RegistroPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-alma-light flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-alma-warm border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <RegistroContent />
+    </Suspense>
   );
 }
