@@ -7,7 +7,8 @@ export default function Hero() {
         muted
         loop
         playsInline
-        className="absolute inset-0 w-full h-full object-cover"
+        disablePictureInPicture
+        className="absolute inset-0 w-full h-full object-cover object-top"
       />
       <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
 
