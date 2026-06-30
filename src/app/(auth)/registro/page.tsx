@@ -15,6 +15,8 @@ function RegistroContent() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState(refCode);
+  const [referralSource, setReferralSource] = useState("");
+  const [objective, setObjective] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -40,6 +42,8 @@ function RegistroContent() {
           first_name: firstName,
           last_name: lastName,
           phone,
+          referral_source: referralSource || null,
+          objective: objective || null,
         },
       },
     });
@@ -205,6 +209,51 @@ function RegistroContent() {
               className="w-full px-4 py-3 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-alma-gold transition-colors"
               placeholder="Mínimo 6 caracteres"
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="referralSource"
+              className="block text-xs tracking-wider text-stone-500 mb-2 uppercase"
+            >
+              ¿Cómo nos encontraste? <span className="text-stone-300">(opcional)</span>
+            </label>
+            <select
+              id="referralSource"
+              value={referralSource}
+              onChange={(e) => setReferralSource(e.target.value)}
+              className="w-full px-4 py-3 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-alma-gold transition-colors bg-white"
+            >
+              <option value="">— Selecciona una opción —</option>
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+              <option value="google">Google</option>
+              <option value="referido">Me lo recomendó alguien</option>
+              <option value="walk_in">Pasé por el estudio</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="objective"
+              className="block text-xs tracking-wider text-stone-500 mb-2 uppercase"
+            >
+              ¿Cuál es tu objetivo? <span className="text-stone-300">(opcional)</span>
+            </label>
+            <select
+              id="objective"
+              value={objective}
+              onChange={(e) => setObjective(e.target.value)}
+              className="w-full px-4 py-3 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-alma-gold transition-colors bg-white"
+            >
+              <option value="">— Selecciona una opción —</option>
+              <option value="bienestar">Bienestar general</option>
+              <option value="perdida_peso">Pérdida de peso</option>
+              <option value="rehabilitacion">Rehabilitación / lesión</option>
+              <option value="deporte">Rendimiento deportivo</option>
+              <option value="otro">Otro</option>
+            </select>
           </div>
 
           <div>

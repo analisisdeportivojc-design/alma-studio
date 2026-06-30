@@ -8,8 +8,17 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error && data.user) {
+      const meta = data.user.user_metadata || {};
+      const updates: Record<string, unknown> = {};
+      if (meta.referral_source) updates.referral_source = meta.referral_source;
+      if (meta.objective) updates.objective = meta.objective;
+
+      if (Object.keys(updates).length > 0) {
+        await supabase.from("profiles").update(updates).eq("id", data.user.id);
+      }
+
       return NextResponse.redirect(`${origin}${next}`);
     }
   }
