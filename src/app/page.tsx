@@ -1,4 +1,5 @@
 import Navbar from "@/components/Navbar";
+import PopupBienvenida from "@/components/PopupBienvenida";
 import Hero from "@/components/Hero";
 import Disciplinas from "@/components/Disciplinas";
 import Metodo from "@/components/Metodo";
@@ -28,6 +29,7 @@ export default function Home() {
       </main>
       <Footer />
       <WhatsAppButton />
+      <PopupBienvenida />
     </>
   );
 }
