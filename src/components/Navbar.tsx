@@ -18,7 +18,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md" style={{ backgroundColor: "rgba(229,220,210,0.97)" }}>
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/97 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-20">
           <Link href="/">
             <Image src="/logo.png" alt="Alma Studio" width={120} height={48} className="object-contain" priority />
