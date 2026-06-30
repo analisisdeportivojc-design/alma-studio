@@ -8,6 +8,7 @@ import {
   Package,
   Users,
   UserCircle,
+  CreditCard,
   ArrowLeft,
 } from "lucide-react";
 
@@ -17,6 +18,7 @@ const navItems = [
   { href: "/admin/reservas", label: "Reservas", icon: CalendarCheck },
   { href: "/admin/clientes", label: "Clientes", icon: UserCircle },
   { href: "/admin/paquetes", label: "Paquetes", icon: Package },
+  { href: "/admin/pagos", label: "Pagos", icon: CreditCard },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
 ];
 
