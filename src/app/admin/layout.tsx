@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   Package,
   Users,
+  UserCircle,
   ArrowLeft,
 } from "lucide-react";
 
@@ -14,6 +15,7 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/clases", label: "Clases", icon: Calendar },
   { href: "/admin/reservas", label: "Reservas", icon: CalendarCheck },
+  { href: "/admin/clientes", label: "Clientes", icon: UserCircle },
   { href: "/admin/paquetes", label: "Paquetes", icon: Package },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
 ];
