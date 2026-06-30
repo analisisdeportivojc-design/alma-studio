@@ -8,7 +8,7 @@ import {
   Calendar,
   Package,
   CreditCard,
-  Instagram,
+  AtSign,
   Target,
   MapPin,
   MessageCircle,
@@ -152,7 +152,7 @@ export default async function AdminClientDetailPage({
             )}
             {profile?.instagram_handle && (
               <span className="flex items-center gap-1 text-stone-400 text-sm">
-                <Instagram size={13} />
+                <AtSign size={13} />
                 {profile.instagram_handle}
               </span>
             )}
