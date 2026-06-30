@@ -1,6 +1,7 @@
 export default function Hero() {
   return (
     <section id="inicio" className="relative h-screen flex items-center overflow-hidden">
+      {/* Desktop video */}
       <video
         src="/hero.mp4"
         autoPlay
@@ -8,7 +9,17 @@ export default function Hero() {
         loop
         playsInline
         disablePictureInPicture
-        className="absolute inset-0 w-full h-full object-cover object-top"
+        className="absolute inset-0 w-full h-full object-cover hidden md:block"
+      />
+      {/* Mobile video */}
+      <video
+        src="/hero-mobile.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        disablePictureInPicture
+        className="absolute inset-0 w-full h-full object-cover md:hidden"
       />
       <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
 
