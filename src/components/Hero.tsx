@@ -1,14 +1,13 @@
-import Image from "next/image";
-
 export default function Hero() {
   return (
     <section id="inicio" className="relative h-screen flex items-center overflow-hidden">
-      <Image
-        src="/strength.webp"
-        alt="Alma Studio"
-        fill
-        className="object-cover"
-        priority
+      <video
+        src="/hero.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
       />
       <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
 
