@@ -4,6 +4,7 @@ import { getUserRole, canAccessAdmin } from "@/lib/auth";
 import {
   LayoutDashboard,
   Calendar,
+  CalendarCheck,
   Package,
   Users,
   ArrowLeft,
@@ -12,6 +13,7 @@ import {
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/clases", label: "Clases", icon: Calendar },
+  { href: "/admin/reservas", label: "Reservas", icon: CalendarCheck },
   { href: "/admin/paquetes", label: "Paquetes", icon: Package },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
 ];
