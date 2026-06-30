@@ -7,12 +7,25 @@ export default function Hero() {
   const videoDesktopRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    [videoMobileRef, videoDesktopRef].forEach((ref) => {
-      if (ref.current) {
-        ref.current.muted = true;
-        ref.current.play().catch(() => {});
-      }
-    });
+    const playAll = () => {
+      [videoMobileRef, videoDesktopRef].forEach((ref) => {
+        if (ref.current) {
+          ref.current.muted = true;
+          ref.current.play().catch(() => {});
+        }
+      });
+    };
+
+    playAll();
+
+    // iOS requiere interacción del usuario — se dispara al primer toque
+    document.addEventListener("touchstart", playAll, { once: true });
+    document.addEventListener("click", playAll, { once: true });
+
+    return () => {
+      document.removeEventListener("touchstart", playAll);
+      document.removeEventListener("click", playAll);
+    };
   }, []);
 
   return (
