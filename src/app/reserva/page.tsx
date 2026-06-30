@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ChevronLeft, ChevronRight, Clock, Users, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Users, User, CheckCircle, AlertCircle } from "lucide-react";
 
 interface Session {
   class_id: string;
@@ -18,25 +18,29 @@ interface Session {
   status: string;
   discipline: string | null;
   level: string | null;
-  instructor: {
-    id: string;
-    name: string;
-    photo_url: string | null;
-  } | null;
+  instructor: { id: string; name: string; photo_url: string | null } | null;
+}
+
+interface MyBooking {
+  id: string;
+  session_id: string;
+  status: string;
+}
+
+interface Subscription {
+  classes_remaining: number;
+  end_date: string;
+  packages: { name: string } | null;
 }
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const MONTHS = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
+const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 function getWeekDates(baseDate: Date): Date[] {
   const start = new Date(baseDate);
   const day = start.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   start.setDate(start.getDate() + diff);
-
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
@@ -61,11 +65,10 @@ export default function ReservaPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
-  const [bookingLoading, setBookingLoading] = useState<string | null>(null);
-  const [message, setMessage] = useState<{
-    text: string;
-    type: "success" | "error";
-  } | null>(null);
+  const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
+  const [activeSub, setActiveSub] = useState<Subscription | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [filterDiscipline, setFilterDiscipline] = useState("");
   const [filterInstructor, setFilterInstructor] = useState("");
 
@@ -75,46 +78,51 @@ export default function ReservaPage() {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
+      if (user) fetchUserData(user.id);
     });
   }, []);
+
+  async function fetchUserData(userId: string) {
+    const supabase = createClient();
+    const today = new Date().toISOString().split("T")[0];
+
+    const [{ data: bookings }, { data: subs }] = await Promise.all([
+      supabase
+        .from("bookings")
+        .select("id, session_id, status")
+        .eq("user_id", userId)
+        .in("status", ["confirmed", "waitlist"]),
+      supabase
+        .from("subscriptions")
+        .select("classes_remaining, end_date, packages(name)")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .gte("end_date", today)
+        .order("end_date", { ascending: true })
+        .limit(1),
+    ]);
+
+    setMyBookings(bookings || []);
+    setActiveSub(subs?.[0] ?? null);
+  }
 
   const fetchSessions = useCallback(async () => {
     setLoading(true);
     const dates = getWeekDates(weekStart);
     const start = formatDateStr(dates[0]);
     const end = formatDateStr(dates[6]);
-
-    const res = await fetch(
-      `/api/sessions?start=${start}&end=${end}&business=alma-studio`
-    );
+    const res = await fetch(`/api/sessions?start=${start}&end=${end}&business=alma-studio`);
     const data = await res.json();
     setSessions(data.sessions || []);
     setLoading(false);
   }, [weekStart]);
 
-  useEffect(() => {
-    fetchSessions();
-  }, [fetchSessions]);
-
-  function prevWeek() {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() - 7);
-    setWeekStart(d);
-  }
-
-  function nextWeek() {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + 7);
-    setWeekStart(d);
-  }
+  useEffect(() => { fetchSessions(); }, [fetchSessions]);
 
   async function handleBook(classId: string, date: string) {
-    if (!user) {
-      window.location.href = "/login";
-      return;
-    }
-
-    setBookingLoading(`${classId}-${date}`);
+    if (!user) { window.location.href = "/login"; return; }
+    const key = `${classId}-${date}`;
+    setBusyKey(key);
     setMessage(null);
 
     const res = await fetch("/api/bookings", {
@@ -122,21 +130,46 @@ export default function ReservaPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ class_id: classId, date }),
     });
+    const data = await res.json();
 
+    if (!res.ok) {
+      if (data.no_subscription) {
+        setMessage({ text: "No tienes clases disponibles. Compra un paquete para reservar.", type: "error" });
+      } else {
+        setMessage({ text: data.error, type: "error" });
+      }
+    } else {
+      setMessage({ text: data.message, type: data.waitlist ? "error" : "success" });
+      fetchSessions();
+      if (user) fetchUserData(user.id);
+    }
+
+    setBusyKey(null);
+    setTimeout(() => setMessage(null), 5000);
+  }
+
+  async function handleCancel(bookingId: string, classId: string, date: string) {
+    const key = `cancel-${classId}-${date}`;
+    setBusyKey(key);
+    setMessage(null);
+
+    const res = await fetch("/api/bookings", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ booking_id: bookingId }),
+    });
     const data = await res.json();
 
     if (!res.ok) {
       setMessage({ text: data.error, type: "error" });
     } else {
-      setMessage({
-        text: data.message,
-        type: data.waitlist ? "error" : "success",
-      });
+      setMessage({ text: data.message, type: "success" });
       fetchSessions();
+      if (user) fetchUserData(user.id);
     }
 
-    setBookingLoading(null);
-    setTimeout(() => setMessage(null), 4000);
+    setBusyKey(null);
+    setTimeout(() => setMessage(null), 5000);
   }
 
   const disciplines = [...new Set(sessions.map((s) => s.discipline).filter(Boolean))];
@@ -154,25 +187,16 @@ export default function ReservaPage() {
     <div className="min-h-screen bg-alma-light">
       <nav className="bg-white border-b border-stone-100 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link
-            href="/"
-            className="font-[family-name:var(--font-playfair)] text-xl text-alma-dark"
-          >
+          <Link href="/" className="font-[family-name:var(--font-playfair)] text-xl text-alma-dark">
             Alma Studio
           </Link>
           <div className="flex items-center gap-4">
             {user ? (
-              <Link
-                href="/cuenta"
-                className="text-sm text-stone-500 hover:text-alma-dark transition-colors"
-              >
+              <Link href="/cuenta" className="text-sm text-stone-500 hover:text-alma-dark transition-colors">
                 Mi Cuenta
               </Link>
             ) : (
-              <Link
-                href="/login"
-                className="bg-alma-dark text-white text-xs tracking-[0.15em] px-6 py-2 hover:bg-stone-700 transition-colors"
-              >
+              <Link href="/login" className="bg-alma-dark text-white text-xs tracking-[0.15em] px-6 py-2 hover:bg-stone-700 transition-colors">
                 INICIAR SESIÓN
               </Link>
             )}
@@ -181,23 +205,44 @@ export default function ReservaPage() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="text-center mb-10">
-          <p className="text-xs tracking-[0.3em] text-alma-warm mb-3 uppercase">
-            Reserva tu clase
-          </p>
-          <h1 className="font-[family-name:var(--font-playfair)] text-4xl text-alma-dark">
-            Horario semanal
-          </h1>
+        <div className="text-center mb-8">
+          <p className="text-xs tracking-[0.3em] text-alma-warm mb-3 uppercase">Reserva tu clase</p>
+          <h1 className="font-[family-name:var(--font-playfair)] text-4xl text-alma-dark">Horario semanal</h1>
         </div>
 
+        {/* Subscription status */}
+        {user && (
+          <div className="max-w-lg mx-auto mb-6">
+            {activeSub ? (
+              <div className="flex items-center justify-between bg-white rounded-xl px-5 py-3 shadow-sm border border-stone-100">
+                <div className="flex items-center gap-2">
+                  <CheckCircle size={16} className="text-green-500" />
+                  <span className="text-sm text-alma-dark font-bold">{activeSub.packages?.name}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-bold text-alma-gold">{activeSub.classes_remaining} clases</span>
+                  <p className="text-xs text-stone-400">vence {new Date(activeSub.end_date).toLocaleDateString("es-PE")}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={16} className="text-amber-600" />
+                  <span className="text-sm text-amber-800">No tienes un paquete activo</span>
+                </div>
+                <Link href="/#paquetes" className="text-xs bg-alma-dark text-white px-4 py-1.5 rounded-lg hover:bg-alma-dark/90 transition-colors">
+                  Ver paquetes
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Message */}
         {message && (
-          <div
-            className={`max-w-md mx-auto mb-6 px-4 py-3 rounded-lg text-sm text-center ${
-              message.type === "success"
-                ? "bg-green-50 text-green-700"
-                : "bg-red-50 text-red-600"
-            }`}
-          >
+          <div className={`max-w-md mx-auto mb-6 px-4 py-3 rounded-lg text-sm text-center ${
+            message.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
+          }`}>
             {message.text}
           </div>
         )}
@@ -210,44 +255,27 @@ export default function ReservaPage() {
             className="px-4 py-2 border border-stone-200 rounded-lg text-sm bg-white focus:outline-none focus:border-alma-gold"
           >
             <option value="">Todas las disciplinas</option>
-            {disciplines.map((d) => (
-              <option key={d} value={d!}>
-                {d}
-              </option>
-            ))}
+            {disciplines.map((d) => <option key={d} value={d!}>{d}</option>)}
           </select>
-
           <select
             value={filterInstructor}
             onChange={(e) => setFilterInstructor(e.target.value)}
             className="px-4 py-2 border border-stone-200 rounded-lg text-sm bg-white focus:outline-none focus:border-alma-gold"
           >
             <option value="">Todas las instructoras</option>
-            {instructors.map((i) => (
-              <option key={i} value={i!}>
-                {i}
-              </option>
-            ))}
+            {instructors.map((i) => <option key={i} value={i!}>{i}</option>)}
           </select>
         </div>
 
         {/* Week navigation */}
         <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={prevWeek}
-            className="p-2 hover:bg-white rounded-full transition-colors"
-          >
+          <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }} className="p-2 hover:bg-white rounded-full transition-colors">
             <ChevronLeft size={20} className="text-stone-500" />
           </button>
-
           <h2 className="font-[family-name:var(--font-playfair)] text-lg text-alma-dark">
             {MONTHS[weekDates[0].getMonth()]} {weekDates[0].getFullYear()}
           </h2>
-
-          <button
-            onClick={nextWeek}
-            className="p-2 hover:bg-white rounded-full transition-colors"
-          >
+          <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }} className="p-2 hover:bg-white rounded-full transition-colors">
             <ChevronRight size={20} className="text-stone-500" />
           </button>
         </div>
@@ -258,25 +286,13 @@ export default function ReservaPage() {
             const dateStr = formatDateStr(date);
             const isToday = dateStr === today;
             const isPast = dateStr < today;
-            const daySessions = filteredSessions.filter(
-              (s) => s.date === dateStr
-            );
+            const daySessions = filteredSessions.filter((s) => s.date === dateStr);
 
             return (
               <div key={dateStr} className="flex flex-col">
-                <div
-                  className={`text-center py-3 rounded-t-xl ${
-                    isToday
-                      ? "bg-alma-dark text-white"
-                      : "bg-white text-stone-600"
-                  }`}
-                >
-                  <p className="text-xs font-bold uppercase">
-                    {DAYS[dayIndex]}
-                  </p>
-                  <p
-                    className={`font-[family-name:var(--font-playfair)] text-2xl ${isToday ? "text-white" : "text-alma-dark"}`}
-                  >
+                <div className={`text-center py-3 rounded-t-xl ${isToday ? "bg-alma-dark text-white" : "bg-white text-stone-600"}`}>
+                  <p className="text-xs font-bold uppercase">{DAYS[dayIndex]}</p>
+                  <p className={`font-[family-name:var(--font-playfair)] text-2xl ${isToday ? "text-white" : "text-alma-dark"}`}>
                     {date.getDate()}
                   </p>
                 </div>
@@ -287,36 +303,36 @@ export default function ReservaPage() {
                       <div className="w-5 h-5 border-2 border-alma-warm border-t-transparent rounded-full animate-spin" />
                     </div>
                   ) : daySessions.length === 0 ? (
-                    <p className="text-xs text-stone-300 text-center pt-8">
-                      Sin clases
-                    </p>
+                    <p className="text-xs text-stone-300 text-center pt-8">Sin clases</p>
                   ) : (
                     daySessions.map((session) => {
                       const isFull = session.available <= 0;
                       const isCancelled = session.status === "cancelled";
                       const bookingKey = `${session.class_id}-${session.date}`;
-                      const isBooking = bookingLoading === bookingKey;
+                      const isBusy = busyKey === bookingKey || busyKey === `cancel-${bookingKey}`;
+
+                      const myBooking = session.session_id
+                        ? myBookings.find((b) => b.session_id === session.session_id)
+                        : null;
+                      const isBooked = myBooking?.status === "confirmed";
+                      const isWaitlisted = myBooking?.status === "waitlist";
 
                       return (
-                        <button
+                        <div
                           key={bookingKey}
-                          onClick={() =>
-                            !isPast &&
-                            !isCancelled &&
-                            handleBook(session.class_id, session.date)
-                          }
-                          disabled={isPast || isCancelled || isBooking}
-                          className={`w-full text-left p-3 rounded-lg border transition-all text-xs ${
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition-all ${
                             isPast || isCancelled
-                              ? "opacity-40 cursor-not-allowed border-stone-100 bg-stone-50"
-                              : isFull
-                                ? "border-amber-200 bg-amber-50 hover:border-amber-300 cursor-pointer"
-                                : "border-stone-100 bg-alma-light hover:border-alma-gold hover:shadow-sm cursor-pointer"
+                              ? "opacity-40 border-stone-100 bg-stone-50"
+                              : isBooked
+                                ? "border-green-200 bg-green-50"
+                                : isWaitlisted
+                                  ? "border-amber-200 bg-amber-50"
+                                  : isFull
+                                    ? "border-amber-200 bg-amber-50"
+                                    : "border-stone-100 bg-alma-light hover:border-alma-gold hover:shadow-sm"
                           }`}
                         >
-                          <p className="font-bold text-alma-dark leading-tight mb-1">
-                            {session.name}
-                          </p>
+                          <p className="font-bold text-alma-dark leading-tight mb-1">{session.name}</p>
                           {session.instructor && (
                             <p className="text-alma-warm flex items-center gap-1 mb-1">
                               <User size={10} />
@@ -327,25 +343,47 @@ export default function ReservaPage() {
                             <Clock size={10} />
                             {formatTime(session.start_time)}
                           </p>
-                          <div className="flex items-center gap-1 mt-2">
+                          <div className="flex items-center gap-1 mt-1.5">
                             <Users size={10} className="text-stone-400" />
-                            <span
-                              className={
-                                isFull ? "text-amber-600" : "text-green-600"
-                              }
-                            >
+                            <span className={isFull && !isBooked ? "text-amber-600" : "text-stone-500"}>
                               {session.booked_count}/{session.max_capacity}
                             </span>
                           </div>
-                          {isBooking && (
-                            <p className="text-alma-gold mt-1">Reservando...</p>
+
+                          {!isPast && !isCancelled && (
+                            <div className="mt-2">
+                              {isBooked ? (
+                                <button
+                                  onClick={() => handleCancel(myBooking!.id, session.class_id, session.date)}
+                                  disabled={isBusy}
+                                  className="w-full text-center text-[10px] py-1 rounded bg-green-100 text-green-700 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+                                >
+                                  {isBusy ? "..." : "✓ Reservada · Cancelar"}
+                                </button>
+                              ) : isWaitlisted ? (
+                                <button
+                                  onClick={() => handleCancel(myBooking!.id, session.class_id, session.date)}
+                                  disabled={isBusy}
+                                  className="w-full text-center text-[10px] py-1 rounded bg-amber-100 text-amber-700 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+                                >
+                                  {isBusy ? "..." : "En espera · Salir"}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleBook(session.class_id, session.date)}
+                                  disabled={isBusy}
+                                  className="w-full text-center text-[10px] py-1 rounded bg-alma-dark text-white hover:bg-alma-dark/80 transition-colors disabled:opacity-50"
+                                >
+                                  {isBusy ? "..." : isFull ? "Lista de espera" : "Reservar"}
+                                </button>
+                              )}
+                            </div>
                           )}
-                          {isFull && !isPast && (
-                            <p className="text-amber-600 mt-1">
-                              Lista de espera
-                            </p>
+
+                          {isCancelled && (
+                            <p className="mt-1.5 text-[10px] text-red-400">Cancelada</p>
                           )}
-                        </button>
+                        </div>
                       );
                     })
                   )}
@@ -357,28 +395,20 @@ export default function ReservaPage() {
 
         <div className="mt-8 flex flex-wrap gap-6 justify-center text-xs text-stone-500">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-alma-light border border-stone-200" />
-            Disponible
+            <div className="w-3 h-3 rounded-full bg-alma-light border border-stone-200" />Disponible
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-50 border border-amber-200" />
-            Clase llena
+            <div className="w-3 h-3 rounded-full bg-green-100 border border-green-200" />Reservada
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-stone-100 opacity-40" />
-            Pasada
+            <div className="w-3 h-3 rounded-full bg-amber-50 border border-amber-200" />Llena / En espera
           </div>
         </div>
 
         {!user && (
           <div className="mt-10 text-center bg-white rounded-2xl p-8 max-w-md mx-auto">
-            <p className="text-stone-500 text-sm mb-4">
-              Inicia sesión para reservar tu clase
-            </p>
-            <Link
-              href="/login"
-              className="inline-block bg-alma-dark text-white text-xs tracking-[0.15em] px-8 py-3 hover:bg-stone-700 transition-colors"
-            >
+            <p className="text-stone-500 text-sm mb-4">Inicia sesión para reservar tu clase</p>
+            <Link href="/login" className="inline-block bg-alma-dark text-white text-xs tracking-[0.15em] px-8 py-3 hover:bg-stone-700 transition-colors">
               INICIAR SESIÓN
             </Link>
           </div>
