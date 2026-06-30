@@ -1,7 +1,24 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
 export default function Hero() {
+  const videoMobileRef = useRef<HTMLVideoElement>(null);
+  const videoDesktopRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    [videoMobileRef, videoDesktopRef].forEach((ref) => {
+      if (ref.current) {
+        ref.current.muted = true;
+        ref.current.play().catch(() => {});
+      }
+    });
+  }, []);
+
   return (
-    <section id="inicio" className="relative h-screen flex items-center overflow-hidden">
+    <section id="inicio" className="relative h-[100svh] flex items-center overflow-hidden">
       <video
+        ref={videoMobileRef}
         src="/hero-mobile.mp4"
         autoPlay
         muted
@@ -11,6 +28,7 @@ export default function Hero() {
         className="absolute inset-0 w-full h-full object-cover md:hidden"
       />
       <video
+        ref={videoDesktopRef}
         src="/hero.mp4"
         autoPlay
         muted
