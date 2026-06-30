@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { X } from "lucide-react";
 
 const navLinks = [
@@ -17,13 +18,10 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md">
+      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md" style={{ backgroundColor: "rgba(229,220,210,0.97)" }}>
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between h-20">
-          <Link
-            href="/"
-            className="font-[family-name:var(--font-playfair)] text-2xl tracking-wide text-alma-dark"
-          >
-            Alma Studio
+          <Link href="/">
+            <Image src="/logo.png" alt="Alma Studio" width={120} height={48} className="object-contain" priority />
           </Link>
 
           <div className="hidden lg:flex items-center gap-10">
@@ -71,9 +69,7 @@ export default function Navbar() {
       {open && (
         <div className="fixed inset-0 z-[60] bg-alma-deep flex flex-col animate-fade-in">
           <div className="flex items-center justify-between px-6 h-20">
-            <span className="font-[family-name:var(--font-playfair)] text-2xl text-white">
-              Alma Studio
-            </span>
+            <Image src="/logo.png" alt="Alma Studio" width={100} height={40} className="object-contain" />
             <button onClick={() => setOpen(false)} className="text-white">
               <X size={24} />
             </button>
