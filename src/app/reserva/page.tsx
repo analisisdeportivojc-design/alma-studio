@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { ChevronLeft, ChevronRight, Clock, Users, User, CheckCircle, AlertCircle } from "lucide-react";
 import SessionDetailPanel from "./SessionDetailPanel";
+import PendingRatingModal from "@/components/PendingRatingModal";
 
 interface Session {
   class_id: string;
@@ -329,6 +330,9 @@ export default function ReservaPage() {
           </div>
         )}
       </div>
+
+      {/* Post-class rating notification */}
+      {user && businessId && <PendingRatingModal businessId={businessId} />}
 
       {/* Session detail panel */}
       {selectedSession && businessId && (

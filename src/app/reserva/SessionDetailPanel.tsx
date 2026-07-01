@@ -40,20 +40,21 @@ interface Props {
   user: any;
 }
 
-function Stars({ value, interactive, onChange }: { value: number; interactive?: boolean; onChange?: (v: number) => void }) {
-  const [hovered, setHovered] = useState(0);
+function StarsDisplay({ value, count }: { value: number; count: number }) {
   return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button key={n} type="button"
-          onClick={() => interactive && onChange?.(n)}
-          onMouseEnter={() => interactive && setHovered(n)}
-          onMouseLeave={() => interactive && setHovered(0)}
-          className={interactive ? "cursor-pointer" : "cursor-default"}
-        >
-          <Star size={20} className={n <= (hovered || value) ? "text-amber-400 fill-amber-400" : "text-stone-200"} />
-        </button>
-      ))}
+    <div className="flex items-center gap-2">
+      <div className="flex gap-0.5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Star
+            key={n}
+            size={14}
+            className={n <= Math.round(value) ? "text-amber-400 fill-amber-400" : "text-stone-300"}
+          />
+        ))}
+      </div>
+      <span className="text-xs text-stone-400">
+        {value.toFixed(1)} · {count} {count === 1 ? "valoración" : "valoraciones"}
+      </span>
     </div>
   );
 }
@@ -66,10 +67,7 @@ function getYouTubeId(url: string) {
 export default function SessionDetailPanel({ session, businessId, myBooking, onClose, onBook, onCancel, busy, user }: Props) {
   const [instructor, setInstructor] = useState<InstructorDetail | null>(null);
   const [avgRating, setAvgRating] = useState<number | null>(null);
-  const [myRating, setMyRating] = useState(0);
-  const [ratingComment, setRatingComment] = useState("");
-  const [ratingSubmitted, setRatingSubmitted] = useState(false);
-  const [submittingRating, setSubmittingRating] = useState(false);
+  const [ratingCount, setRatingCount] = useState(0);
 
   const isFull = session.available <= 0;
   const isPast = session.date < new Date().toISOString().split("T")[0];
@@ -81,23 +79,17 @@ export default function SessionDetailPanel({ session, businessId, myBooking, onC
     if (session.instructor?.id) {
       fetch(`/api/instructors/${session.instructor.id}`)
         .then((r) => r.json())
-        .then((d) => { setInstructor(d.instructor); setAvgRating(d.avg_rating); });
+        .then((d) => {
+          setInstructor(d.instructor);
+          setAvgRating(d.avg_rating);
+          setRatingCount(d.ratings?.length || 0);
+        });
     }
   }, [session.instructor?.id]);
 
-  async function submitRating() {
-    if (!myRating || !user) return;
-    setSubmittingRating(true);
-    await fetch("/api/instructor-ratings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ instructor_id: session.instructor!.id, business_id: businessId, rating: myRating, comment: ratingComment || undefined }),
-    });
-    setSubmittingRating(false);
-    setRatingSubmitted(true);
-  }
-
-  const dateLabel = new Date(session.date + "T12:00:00").toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
+  const dateLabel = new Date(session.date + "T12:00:00").toLocaleDateString("es-PE", {
+    weekday: "long", day: "numeric", month: "long",
+  });
   const timeLabel = (() => {
     const [h, m] = session.start_time.split(":");
     const hour = parseInt(h);
@@ -113,9 +105,12 @@ export default function SessionDetailPanel({ session, businessId, myBooking, onC
 
       {/* Modal */}
       <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-        {/* Header with instructor photo bg */}
+        {/* Header */}
         <div className="relative bg-alma-dark text-white">
-          <button onClick={onClose} className="absolute top-4 right-4 z-10 w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 z-10 w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+          >
             <X size={16} />
           </button>
 
@@ -150,18 +145,21 @@ export default function SessionDetailPanel({ session, businessId, myBooking, onC
               {session.instructor && (
                 <div className="mt-2">
                   <p className="text-stone-300 text-sm font-bold">{session.instructor.name}</p>
-                  {instructor?.tagline && <p className="text-alma-gold text-xs mt-0.5">{instructor.tagline}</p>}
-                  {avgRating !== null && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <Stars value={Math.round(avgRating)} />
-                      <span className="text-xs text-stone-400">{avgRating.toFixed(1)}</span>
+                  {instructor?.tagline && (
+                    <p className="text-alma-gold text-xs mt-0.5">{instructor.tagline}</p>
+                  )}
+                  {avgRating !== null && ratingCount > 0 && (
+                    <div className="mt-1.5">
+                      <StarsDisplay value={avgRating} count={ratingCount} />
                     </div>
                   )}
                 </div>
               )}
 
               <div className="flex items-center gap-5 mt-3 text-sm text-stone-300">
-                <span className="flex items-center gap-1.5"><Clock size={13} />{timeLabel} · {session.duration_minutes} min</span>
+                <span className="flex items-center gap-1.5">
+                  <Clock size={13} />{timeLabel} · {session.duration_minutes} min
+                </span>
                 <span className="flex items-center gap-1.5">
                   <Users size={13} />
                   {session.booked_count}/{session.max_capacity}
@@ -187,7 +185,6 @@ export default function SessionDetailPanel({ session, businessId, myBooking, onC
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-
           {/* Instructor bio */}
           {instructor?.bio && (
             <div>
@@ -207,8 +204,12 @@ export default function SessionDetailPanel({ session, businessId, myBooking, onC
 
           {/* Instagram */}
           {instructor?.instagram_handle && (
-            <a href={`https://instagram.com/${instructor.instagram_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-stone-500 hover:text-alma-warm transition-colors">
+            <a
+              href={`https://instagram.com/${instructor.instagram_handle.replace("@", "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm text-stone-500 hover:text-alma-warm transition-colors"
+            >
               <AtSign size={14} />{instructor.instagram_handle}
             </a>
           )}
@@ -222,8 +223,12 @@ export default function SessionDetailPanel({ session, businessId, myBooking, onC
                   const ytId = getYouTubeId(url);
                   return ytId ? (
                     <div key={i} className="rounded-xl overflow-hidden aspect-video">
-                      <iframe src={`https://www.youtube.com/embed/${ytId}`} className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                      <iframe
+                        src={`https://www.youtube.com/embed/${ytId}`}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
                     </div>
                   ) : (
                     <a key={i} href={url} target="_blank" rel="noopener noreferrer"
@@ -236,29 +241,11 @@ export default function SessionDetailPanel({ session, businessId, myBooking, onC
             </div>
           )}
 
-          {/* Rate instructor */}
-          {user && session.instructor && (
-            <div className="border-t border-stone-100 pt-6">
-              <h3 className="text-xs uppercase tracking-wider text-stone-400 mb-3">Califica a la instructora</h3>
-              {ratingSubmitted ? (
-                <p className="text-sm text-green-600">¡Gracias por tu calificación!</p>
-              ) : (
-                <div className="space-y-3">
-                  <Stars value={myRating} interactive onChange={setMyRating} />
-                  {myRating > 0 && (
-                    <>
-                      <textarea value={ratingComment} onChange={(e) => setRatingComment(e.target.value)}
-                        placeholder="Comentario opcional..." rows={2}
-                        className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-alma-gold resize-none" />
-                      <button onClick={submitRating} disabled={submittingRating}
-                        className="text-xs bg-alma-dark text-white px-4 py-2 rounded-lg hover:bg-alma-dark/90 transition-colors disabled:opacity-50">
-                        {submittingRating ? "Enviando..." : "Enviar calificación"}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+          {/* No instructor message */}
+          {!session.instructor && (
+            <p className="text-sm text-stone-400 italic text-center py-4">
+              Instructora por confirmar
+            </p>
           )}
         </div>
 
@@ -267,20 +254,31 @@ export default function SessionDetailPanel({ session, businessId, myBooking, onC
           <div className="p-5 border-t border-stone-100 bg-white">
             {isBooked ? (
               <div className="flex gap-3">
-                <div className="flex-1 py-3 rounded-xl bg-green-50 text-green-700 text-sm font-bold text-center">✓ Reservada</div>
-                <button onClick={() => onCancel(myBooking!.id, session.class_id, session.date)} disabled={busy}
-                  className="px-5 py-3 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50 transition-colors disabled:opacity-50">
+                <div className="flex-1 py-3 rounded-xl bg-green-50 text-green-700 text-sm font-bold text-center">
+                  ✓ Reservada
+                </div>
+                <button
+                  onClick={() => onCancel(myBooking!.id, session.class_id, session.date)}
+                  disabled={busy}
+                  className="px-5 py-3 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+                >
                   {busy ? "..." : "Cancelar"}
                 </button>
               </div>
             ) : isWaitlisted ? (
-              <button onClick={() => onCancel(myBooking!.id, session.class_id, session.date)} disabled={busy}
-                className="w-full py-3 rounded-xl border border-amber-200 text-amber-600 text-sm hover:bg-amber-50 transition-colors disabled:opacity-50">
+              <button
+                onClick={() => onCancel(myBooking!.id, session.class_id, session.date)}
+                disabled={busy}
+                className="w-full py-3 rounded-xl border border-amber-200 text-amber-600 text-sm hover:bg-amber-50 transition-colors disabled:opacity-50"
+              >
                 {busy ? "Procesando..." : "En lista de espera · Salir"}
               </button>
             ) : (
-              <button onClick={() => onBook(session.class_id, session.date)} disabled={busy}
-                className="w-full py-3 rounded-xl bg-alma-dark text-white text-sm font-bold hover:bg-alma-dark/90 transition-colors disabled:opacity-50">
+              <button
+                onClick={() => onBook(session.class_id, session.date)}
+                disabled={busy}
+                className="w-full py-3 rounded-xl bg-alma-dark text-white text-sm font-bold hover:bg-alma-dark/90 transition-colors disabled:opacity-50"
+              >
                 {busy ? "Reservando..." : isFull ? "Entrar a lista de espera" : "Reservar esta clase"}
               </button>
             )}
