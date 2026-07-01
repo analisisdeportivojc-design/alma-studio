@@ -131,14 +131,19 @@ export default function HorarioPage() {
   async function assignInstructor(cls: ClassTemplate, date: string, instructorId: string | null) {
     const key = `${cls.id}-${date}`;
     setSaving(key);
-    await fetch("/api/admin/schedule", {
+    const res = await fetch("/api/admin/schedule", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ class_id: cls.id, date, instructor_id: instructorId }),
     });
+    const data = await res.json();
     setSaving(null);
-    setAssignModal(null);
-    load();
+    if (!res.ok || data.error) {
+      setApiError(`Error al guardar: ${data.error || res.status}`);
+    } else {
+      setAssignModal(null);
+      load();
+    }
   }
 
   async function toggleCancel(cls: ClassTemplate, date: string, currentStatus: string) {
