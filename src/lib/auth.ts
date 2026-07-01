@@ -32,7 +32,7 @@ export async function getUserRole(
     .select("role")
     .eq("user_id", user.id)
     .eq("business_id", business.id)
-    .eq("is_active", true)
+    .neq("is_active", false)
     .single();
 
   return {
