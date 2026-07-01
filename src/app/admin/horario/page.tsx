@@ -126,6 +126,22 @@ export default function HorarioPage() {
     setCurrentMonday(getMondayOfWeek(new Date()));
   }
 
+  async function handleClear() {
+    if (!confirm("¿Limpiar las próximas 2 semanas? Se borrarán todas las asignaciones sin reservas.")) return;
+    setAutofilling(true);
+    setAutofillMsg(null);
+    const res = await fetch("/api/admin/schedule/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weeks: 2 }),
+    });
+    const data = await res.json();
+    setAutofilling(false);
+    setAutofillMsg({ text: data.message || (res.ok ? "Limpiado" : data.error), ok: res.ok });
+    if (res.ok) load();
+    setTimeout(() => setAutofillMsg(null), 5000);
+  }
+
   async function handleAutofill(reset = false) {
     if (reset && !confirm("¿Limpiar y rellenar las próximas 2 semanas? Se borrarán las asignaciones sin reservas y se recrearán con las instructoras por defecto.")) return;
     setAutofilling(true);
@@ -258,13 +274,13 @@ export default function HorarioPage() {
           </button>
 
           <button
-            onClick={() => handleAutofill(true)}
+            onClick={() => handleClear()}
             disabled={autofilling}
             className="flex items-center gap-1.5 px-4 py-2 bg-white border border-stone-200 text-stone-500 text-xs rounded-lg hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors disabled:opacity-50"
-            title="Borra las sesiones sin reservas y las recrea desde cero con las instructoras por defecto"
+            title="Borra las sesiones sin reservas de las próximas 2 semanas"
           >
             <RotateCcw size={13} />
-            Limpiar y rellenar
+            Limpiar
           </button>
         </div>
       </div>
