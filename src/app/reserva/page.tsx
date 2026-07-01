@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { ChevronLeft, ChevronRight, Clock, Users, User, CheckCircle, AlertCircle } from "lucide-react";
+import SessionDetailPanel from "./SessionDetailPanel";
 
 interface Session {
   class_id: string;
@@ -21,19 +22,14 @@ interface Session {
   instructor: { id: string; name: string; photo_url: string | null } | null;
 }
 
-interface MyBooking {
-  id: string;
-  session_id: string;
-  status: string;
-}
-
+interface MyBooking { id: string; session_id: string; status: string; }
 interface Subscription {
   classes_remaining: number;
   end_date: string;
   packages: { name: string } | { name: string }[] | null;
 }
 
-const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const DAYS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 function getWeekDates(baseDate: Date): Date[] {
@@ -56,21 +52,21 @@ function formatTime(time: string) {
   return `${h12}:${m} ${ampm}`;
 }
 
-function formatDateStr(d: Date) {
-  return d.toISOString().split("T")[0];
-}
+function formatDateStr(d: Date) { return d.toISOString().split("T")[0]; }
 
 export default function ReservaPage() {
   const [weekStart, setWeekStart] = useState(() => new Date());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [businessId, setBusinessId] = useState<string | null>(null);
   const [myBookings, setMyBookings] = useState<MyBooking[]>([]);
   const [activeSub, setActiveSub] = useState<Subscription | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [filterDiscipline, setFilterDiscipline] = useState("");
   const [filterInstructor, setFilterInstructor] = useState("");
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
   const weekDates = getWeekDates(weekStart);
 
@@ -80,28 +76,18 @@ export default function ReservaPage() {
       setUser(user);
       if (user) fetchUserData(user.id);
     });
+    // get businessId
+    supabase.from("businesses").select("id").eq("slug", "alma-studio").single()
+      .then(({ data }) => { if (data) setBusinessId(data.id); });
   }, []);
 
   async function fetchUserData(userId: string) {
     const supabase = createClient();
     const today = new Date().toISOString().split("T")[0];
-
     const [{ data: bookings }, { data: subs }] = await Promise.all([
-      supabase
-        .from("bookings")
-        .select("id, session_id, status")
-        .eq("user_id", userId)
-        .in("status", ["confirmed", "waitlist"]),
-      supabase
-        .from("subscriptions")
-        .select("classes_remaining, end_date, packages(name)")
-        .eq("user_id", userId)
-        .eq("status", "active")
-        .gte("end_date", today)
-        .order("end_date", { ascending: true })
-        .limit(1),
+      supabase.from("bookings").select("id, session_id, status").eq("user_id", userId).in("status", ["confirmed", "waitlist"]),
+      supabase.from("subscriptions").select("classes_remaining, end_date, packages(name)").eq("user_id", userId).eq("status", "active").gte("end_date", today).order("end_date", { ascending: true }).limit(1),
     ]);
-
     setMyBookings(bookings || []);
     setActiveSub(subs?.[0] ?? null);
   }
@@ -124,26 +110,19 @@ export default function ReservaPage() {
     const key = `${classId}-${date}`;
     setBusyKey(key);
     setMessage(null);
-
     const res = await fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ class_id: classId, date }),
     });
     const data = await res.json();
-
     if (!res.ok) {
-      if (data.no_subscription) {
-        setMessage({ text: "No tienes clases disponibles. Compra un paquete para reservar.", type: "error" });
-      } else {
-        setMessage({ text: data.error, type: "error" });
-      }
+      setMessage({ text: data.no_subscription ? "No tienes clases disponibles. Compra un paquete para reservar." : data.error, type: "error" });
     } else {
       setMessage({ text: data.message, type: data.waitlist ? "error" : "success" });
       fetchSessions();
       if (user) fetchUserData(user.id);
     }
-
     setBusyKey(null);
     setTimeout(() => setMessage(null), 5000);
   }
@@ -152,14 +131,12 @@ export default function ReservaPage() {
     const key = `cancel-${classId}-${date}`;
     setBusyKey(key);
     setMessage(null);
-
     const res = await fetch("/api/bookings", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ booking_id: bookingId }),
     });
     const data = await res.json();
-
     if (!res.ok) {
       setMessage({ text: data.error, type: "error" });
     } else {
@@ -167,38 +144,32 @@ export default function ReservaPage() {
       fetchSessions();
       if (user) fetchUserData(user.id);
     }
-
     setBusyKey(null);
     setTimeout(() => setMessage(null), 5000);
   }
 
   const disciplines = [...new Set(sessions.map((s) => s.discipline).filter(Boolean))];
   const instructors = [...new Set(sessions.map((s) => s.instructor?.name).filter(Boolean))];
-
   const filteredSessions = sessions.filter((s) => {
     if (filterDiscipline && s.discipline !== filterDiscipline) return false;
     if (filterInstructor && s.instructor?.name !== filterInstructor) return false;
     return true;
   });
-
   const today = formatDateStr(new Date());
+  const pkgName = activeSub
+    ? Array.isArray(activeSub.packages) ? activeSub.packages[0]?.name : activeSub.packages?.name
+    : null;
 
   return (
     <div className="min-h-screen bg-alma-light">
       <nav className="bg-white border-b border-stone-100 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="font-[family-name:var(--font-playfair)] text-xl text-alma-dark">
-            Alma Studio
-          </Link>
+          <Link href="/" className="font-[family-name:var(--font-playfair)] text-xl text-alma-dark">Alma Studio</Link>
           <div className="flex items-center gap-4">
             {user ? (
-              <Link href="/cuenta" className="text-sm text-stone-500 hover:text-alma-dark transition-colors">
-                Mi Cuenta
-              </Link>
+              <Link href="/cuenta" className="text-sm text-stone-500 hover:text-alma-dark transition-colors">Mi Cuenta</Link>
             ) : (
-              <Link href="/login" className="bg-alma-dark text-white text-xs tracking-[0.15em] px-6 py-2 hover:bg-stone-700 transition-colors">
-                INICIAR SESIÓN
-              </Link>
+              <Link href="/login" className="bg-alma-dark text-white text-xs tracking-[0.15em] px-6 py-2 hover:bg-stone-700 transition-colors">INICIAR SESIÓN</Link>
             )}
           </div>
         </div>
@@ -217,9 +188,7 @@ export default function ReservaPage() {
               <div className="flex items-center justify-between bg-white rounded-xl px-5 py-3 shadow-sm border border-stone-100">
                 <div className="flex items-center gap-2">
                   <CheckCircle size={16} className="text-green-500" />
-                  <span className="text-sm text-alma-dark font-bold">
-                    {Array.isArray(activeSub.packages) ? activeSub.packages[0]?.name : activeSub.packages?.name}
-                  </span>
+                  <span className="text-sm text-alma-dark font-bold">{pkgName}</span>
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-bold text-alma-gold">{activeSub.classes_remaining} clases</span>
@@ -232,38 +201,25 @@ export default function ReservaPage() {
                   <AlertCircle size={16} className="text-amber-600" />
                   <span className="text-sm text-amber-800">No tienes un paquete activo</span>
                 </div>
-                <Link href="/#paquetes" className="text-xs bg-alma-dark text-white px-4 py-1.5 rounded-lg hover:bg-alma-dark/90 transition-colors">
-                  Ver paquetes
-                </Link>
+                <Link href="/#paquetes" className="text-xs bg-alma-dark text-white px-4 py-1.5 rounded-lg hover:bg-alma-dark/90 transition-colors">Ver paquetes</Link>
               </div>
             )}
           </div>
         )}
 
-        {/* Message */}
         {message && (
-          <div className={`max-w-md mx-auto mb-6 px-4 py-3 rounded-lg text-sm text-center ${
-            message.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
-          }`}>
+          <div className={`max-w-md mx-auto mb-6 px-4 py-3 rounded-lg text-sm text-center ${message.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
             {message.text}
           </div>
         )}
 
         {/* Filters */}
         <div className="flex flex-wrap gap-4 mb-8 justify-center">
-          <select
-            value={filterDiscipline}
-            onChange={(e) => setFilterDiscipline(e.target.value)}
-            className="px-4 py-2 border border-stone-200 rounded-lg text-sm bg-white focus:outline-none focus:border-alma-gold"
-          >
+          <select value={filterDiscipline} onChange={(e) => setFilterDiscipline(e.target.value)} className="px-4 py-2 border border-stone-200 rounded-lg text-sm bg-white focus:outline-none focus:border-alma-gold">
             <option value="">Todas las disciplinas</option>
             {disciplines.map((d) => <option key={d} value={d!}>{d}</option>)}
           </select>
-          <select
-            value={filterInstructor}
-            onChange={(e) => setFilterInstructor(e.target.value)}
-            className="px-4 py-2 border border-stone-200 rounded-lg text-sm bg-white focus:outline-none focus:border-alma-gold"
-          >
+          <select value={filterInstructor} onChange={(e) => setFilterInstructor(e.target.value)} className="px-4 py-2 border border-stone-200 rounded-lg text-sm bg-white focus:outline-none focus:border-alma-gold">
             <option value="">Todas las instructoras</option>
             {instructors.map((i) => <option key={i} value={i!}>{i}</option>)}
           </select>
@@ -294,9 +250,7 @@ export default function ReservaPage() {
               <div key={dateStr} className="flex flex-col">
                 <div className={`text-center py-3 rounded-t-xl ${isToday ? "bg-alma-dark text-white" : "bg-white text-stone-600"}`}>
                   <p className="text-xs font-bold uppercase">{DAYS[dayIndex]}</p>
-                  <p className={`font-[family-name:var(--font-playfair)] text-2xl ${isToday ? "text-white" : "text-alma-dark"}`}>
-                    {date.getDate()}
-                  </p>
+                  <p className={`font-[family-name:var(--font-playfair)] text-2xl ${isToday ? "text-white" : "text-alma-dark"}`}>{date.getDate()}</p>
                 </div>
 
                 <div className="flex-1 bg-white rounded-b-xl p-3 space-y-3 min-h-[200px]">
@@ -312,79 +266,45 @@ export default function ReservaPage() {
                       const isCancelled = session.status === "cancelled";
                       const bookingKey = `${session.class_id}-${session.date}`;
                       const isBusy = busyKey === bookingKey || busyKey === `cancel-${bookingKey}`;
-
-                      const myBooking = session.session_id
-                        ? myBookings.find((b) => b.session_id === session.session_id)
-                        : null;
+                      const myBooking = session.session_id ? myBookings.find((b) => b.session_id === session.session_id) ?? null : null;
                       const isBooked = myBooking?.status === "confirmed";
                       const isWaitlisted = myBooking?.status === "waitlist";
 
                       return (
                         <div
                           key={bookingKey}
-                          className={`w-full text-left p-3 rounded-lg border text-xs transition-all ${
-                            isPast || isCancelled
-                              ? "opacity-40 border-stone-100 bg-stone-50"
-                              : isBooked
-                                ? "border-green-200 bg-green-50"
-                                : isWaitlisted
-                                  ? "border-amber-200 bg-amber-50"
-                                  : isFull
-                                    ? "border-amber-200 bg-amber-50"
-                                    : "border-stone-100 bg-alma-light hover:border-alma-gold hover:shadow-sm"
+                          onClick={() => setSelectedSession(session)}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition-all cursor-pointer ${
+                            isPast || isCancelled ? "opacity-40 border-stone-100 bg-stone-50" :
+                            isBooked ? "border-green-200 bg-green-50 hover:border-green-300" :
+                            isWaitlisted ? "border-amber-200 bg-amber-50 hover:border-amber-300" :
+                            isFull ? "border-amber-200 bg-amber-50 hover:border-amber-300" :
+                            "border-stone-100 bg-alma-light hover:border-alma-gold hover:shadow-sm"
                           }`}
                         >
-                          <p className="font-bold text-alma-dark leading-tight mb-1">{session.name}</p>
+                          <p className="font-bold text-alma-dark leading-tight">{session.name}</p>
                           {session.instructor && (
-                            <p className="text-alma-warm flex items-center gap-1 mb-1">
+                            <p className="text-alma-warm flex items-center gap-1 mt-1">
                               <User size={10} />
                               {session.instructor.name}
                             </p>
                           )}
-                          <p className="text-stone-400 flex items-center gap-1">
+                          {session.discipline && (
+                            <p className="text-stone-400 mt-0.5">{session.discipline}</p>
+                          )}
+                          <p className="text-stone-400 flex items-center gap-1 mt-1">
                             <Clock size={10} />
                             {formatTime(session.start_time)}
                           </p>
-                          <div className="flex items-center gap-1 mt-1.5">
-                            <Users size={10} className="text-stone-400" />
-                            <span className={isFull && !isBooked ? "text-amber-600" : "text-stone-500"}>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="flex items-center gap-1 text-stone-400">
+                              <Users size={10} />
                               {session.booked_count}/{session.max_capacity}
                             </span>
+                            {isBooked && <span className="text-green-600 font-bold">✓</span>}
+                            {isWaitlisted && <span className="text-amber-600">~</span>}
+                            {isCancelled && <span className="text-red-400">✕</span>}
                           </div>
-
-                          {!isPast && !isCancelled && (
-                            <div className="mt-2">
-                              {isBooked ? (
-                                <button
-                                  onClick={() => handleCancel(myBooking!.id, session.class_id, session.date)}
-                                  disabled={isBusy}
-                                  className="w-full text-center text-[10px] py-1 rounded bg-green-100 text-green-700 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
-                                >
-                                  {isBusy ? "..." : "✓ Reservada · Cancelar"}
-                                </button>
-                              ) : isWaitlisted ? (
-                                <button
-                                  onClick={() => handleCancel(myBooking!.id, session.class_id, session.date)}
-                                  disabled={isBusy}
-                                  className="w-full text-center text-[10px] py-1 rounded bg-amber-100 text-amber-700 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
-                                >
-                                  {isBusy ? "..." : "En espera · Salir"}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleBook(session.class_id, session.date)}
-                                  disabled={isBusy}
-                                  className="w-full text-center text-[10px] py-1 rounded bg-alma-dark text-white hover:bg-alma-dark/80 transition-colors disabled:opacity-50"
-                                >
-                                  {isBusy ? "..." : isFull ? "Lista de espera" : "Reservar"}
-                                </button>
-                              )}
-                            </div>
-                          )}
-
-                          {isCancelled && (
-                            <p className="mt-1.5 text-[10px] text-red-400">Cancelada</p>
-                          )}
                         </div>
                       );
                     })
@@ -396,26 +316,37 @@ export default function ReservaPage() {
         </div>
 
         <div className="mt-8 flex flex-wrap gap-6 justify-center text-xs text-stone-500">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-alma-light border border-stone-200" />Disponible
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-100 border border-green-200" />Reservada
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-50 border border-amber-200" />Llena / En espera
-          </div>
+          <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-alma-light border border-stone-200" />Disponible</div>
+          <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-green-100 border border-green-200" />Reservada</div>
+          <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-amber-50 border border-amber-200" />Llena / En espera</div>
+          <div className="flex items-center gap-2 text-stone-400 italic">Toca cualquier clase para ver detalles</div>
         </div>
 
         {!user && (
           <div className="mt-10 text-center bg-white rounded-2xl p-8 max-w-md mx-auto">
             <p className="text-stone-500 text-sm mb-4">Inicia sesión para reservar tu clase</p>
-            <Link href="/login" className="inline-block bg-alma-dark text-white text-xs tracking-[0.15em] px-8 py-3 hover:bg-stone-700 transition-colors">
-              INICIAR SESIÓN
-            </Link>
+            <Link href="/login" className="inline-block bg-alma-dark text-white text-xs tracking-[0.15em] px-8 py-3 hover:bg-stone-700 transition-colors">INICIAR SESIÓN</Link>
           </div>
         )}
       </div>
+
+      {/* Session detail panel */}
+      {selectedSession && businessId && (
+        <SessionDetailPanel
+          session={selectedSession}
+          businessId={businessId}
+          myBooking={
+            selectedSession.session_id
+              ? myBookings.find((b) => b.session_id === selectedSession.session_id) ?? null
+              : null
+          }
+          onClose={() => setSelectedSession(null)}
+          onBook={(classId, date) => { handleBook(classId, date); setSelectedSession(null); }}
+          onCancel={(bookingId, classId, date) => { handleCancel(bookingId, classId, date); setSelectedSession(null); }}
+          busy={!!busyKey}
+          user={user}
+        />
+      )}
     </div>
   );
 }
