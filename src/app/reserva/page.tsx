@@ -30,7 +30,7 @@ interface MyBooking {
 interface Subscription {
   classes_remaining: number;
   end_date: string;
-  packages: { name: string } | null;
+  packages: { name: string } | { name: string }[] | null;
 }
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -217,7 +217,9 @@ export default function ReservaPage() {
               <div className="flex items-center justify-between bg-white rounded-xl px-5 py-3 shadow-sm border border-stone-100">
                 <div className="flex items-center gap-2">
                   <CheckCircle size={16} className="text-green-500" />
-                  <span className="text-sm text-alma-dark font-bold">{activeSub.packages?.name}</span>
+                  <span className="text-sm text-alma-dark font-bold">
+                    {Array.isArray(activeSub.packages) ? activeSub.packages[0]?.name : activeSub.packages?.name}
+                  </span>
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-bold text-alma-gold">{activeSub.classes_remaining} clases</span>
