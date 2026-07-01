@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     .from("classes")
     .select("id, name, day_of_week, start_time, duration_minutes, max_capacity, discipline, level")
     .eq("business_id", business.id)
-    .eq("is_active", true)
+    .neq("is_active", false)
     .order("day_of_week")
     .order("start_time");
 
