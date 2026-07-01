@@ -7,14 +7,14 @@ export async function GET() {
   const { role } = await getUserRole();
   if (!canAccessAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const supabase = await createClient();
-  const { data: businesses } = await supabase.from("businesses").select("id").limit(1).single();
-  if (!businesses) return NextResponse.json({ error: "No business" }, { status: 400 });
+  const admin = createAdminClient();
+  const { data: business } = await admin.from("businesses").select("id").limit(1).single();
+  if (!business) return NextResponse.json({ error: "No business" }, { status: 400 });
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from("instructors")
     .select("id, bio, specialties, photo_url, video_urls, instagram_handle, tagline, is_active, profiles(id, first_name, last_name, phone)")
-    .eq("business_id", businesses.id)
+    .eq("business_id", business.id)
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
