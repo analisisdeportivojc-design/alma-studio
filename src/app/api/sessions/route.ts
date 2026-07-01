@@ -65,10 +65,10 @@ export async function GET(request: Request) {
     .eq("business_id", business.id)
     .eq("is_active", true);
 
-  // Get existing sessions for the date range
+  // Get existing sessions for the date range (with instructor override)
   const { data: existingSessions } = await supabase
     .from("class_sessions")
-    .select("id, class_id, session_date, status")
+    .select("id, class_id, session_date, status, instructor_id, instructors(id, photo_url, profiles(first_name, last_name))")
     .eq("business_id", business.id)
     .gte("session_date", startDate)
     .lte("session_date", endDate);
@@ -128,13 +128,20 @@ export async function GET(request: Request) {
         status: existingSession?.status || "scheduled",
         discipline: (cls.disciplines as any)?.name || null,
         level: (cls.class_levels as any)?.name || null,
-        instructor: cls.instructors
-          ? {
-              id: (cls.instructors as any).id,
-              name: `${(cls.instructors as any).profiles?.first_name || ""} ${(cls.instructors as any).profiles?.last_name || ""}`.trim(),
-              photo_url: (cls.instructors as any).photo_url,
-            }
-          : null,
+        instructor: (() => {
+            // Use session-level instructor override if assigned, else fall back to class template
+            const sessionInstructor = existingSession && (existingSession as any).instructors
+              ? (existingSession as any).instructors
+              : null;
+            const src = sessionInstructor || (cls.instructors as any) || null;
+            if (!src) return null;
+            const profile = Array.isArray(src.profiles) ? src.profiles[0] : src.profiles;
+            return {
+              id: src.id,
+              name: `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim(),
+              photo_url: src.photo_url,
+            };
+          })(),
       });
     }
   }
