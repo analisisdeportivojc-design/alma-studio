@@ -19,13 +19,15 @@ export async function GET(req: NextRequest) {
   const { monday, sunday, dates } = parseWeek(weekParam);
 
   // Get all active class templates
-  const { data: classes } = await admin
+  const { data: classes, error: classesError } = await admin
     .from("classes")
-    .select("id, name, day_of_week, start_time, duration_minutes, max_capacity, discipline, level")
+    .select("*")
     .eq("business_id", business.id)
     .neq("is_active", false)
     .order("day_of_week")
     .order("start_time");
+
+  if (classesError) return NextResponse.json({ error: `classes: ${classesError.message}` }, { status: 500 });
 
   // Get sessions for this week
   const { data: sessions } = await admin
