@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Vercel Cron: runs every Monday at 9AM Lima (14:00 UTC)
-// vercel.json: { "path": "/api/cron/schedule-reminder", "schedule": "0 14 * * 1" }
-//
-// Revisa si el horario cubre las próximas 2 semanas.
-// Si no, envía un email al admin (kickoffperu@gmail.com).
-// Requiere: RESEND_API_KEY y CRON_SECRET en Vercel
+// Vercel Cron: every Monday at 9AM Lima (14:00 UTC)
+// Requires: RESEND_API_KEY, CRON_SECRET, ADMIN_EMAIL in Vercel env vars
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -59,80 +55,66 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, days_ahead: daysAhead, action: "no_action_needed" });
   }
 
-  // Necesita acción — enviar email al admin
   const adminEmail = process.env.ADMIN_EMAIL || "kickoffperu@gmail.com";
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://alma-studio-pearl.vercel.app";
   const limitDate = new Date(today);
   limitDate.setDate(today.getDate() + daysAhead);
   const limitStr = limitDate.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
 
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
     console.log(`[schedule-reminder] Sin RESEND_API_KEY. Días cubiertos: ${daysAhead}`);
     return NextResponse.json({ ok: true, days_ahead: daysAhead, action: "email_skipped_no_key" });
   }
 
-  const { Resend } = await import("resend");
-  const resend = new Resend(resendKey);
-
-  await resend.emails.send({
-    from: "Alma Studio Sistema <sistema@alma-studio.pe>",
-    to: adminEmail,
-    subject: `⚠ Horario incompleto — solo ${daysAhead} días cubiertos`,
-    html: `
-<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"></head>
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f5f4f0;font-family:Georgia,serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f4f0;padding:40px 20px;">
-    <tr><td align="center">
-      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f4f0;padding:40px 20px;">
+<tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;">
+<tr><td style="background:#2c2c2c;padding:32px 40px;">
+  <p style="color:#c9a96e;font-size:11px;letter-spacing:4px;margin:0 0 6px;text-transform:uppercase;">ALMA STUDIO · SISTEMA</p>
+  <h1 style="color:#fff;font-size:22px;margin:0;font-weight:normal;">Recordatorio de horario</h1>
+</td></tr>
+<tr><td style="padding:36px 40px;">
+  <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px;">
+    El horario solo está cubierto hasta el <strong style="color:#2c2c2c;text-transform:capitalize;">${limitStr}</strong>
+    (<strong>${daysAhead} días</strong> desde hoy).
+  </p>
+  <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 28px;">
+    Recuerda subir al menos <strong>2 semanas</strong> de horario para que las alumnas puedan reservar con anticipación.
+  </p>
+  <table cellpadding="0" cellspacing="0" width="100%"><tr><td align="center">
+    <a href="${appUrl}/admin/horario" style="display:inline-block;background:#c9a96e;color:#fff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:13px;letter-spacing:2px;text-transform:uppercase;font-family:Arial,sans-serif;">
+      Ir al panel de horario
+    </a>
+  </td></tr></table>
+  <p style="color:#aaa;font-size:12px;text-align:center;margin:24px 0 0;">
+    Usa "Auto-rellenar 2 sem." para completar rápidamente con las instructoras por defecto.
+  </p>
+</td></tr>
+<tr><td style="background:#f5f4f0;padding:20px;text-align:center;">
+  <p style="color:#999;font-size:11px;margin:0;">Alma Studio · Sistema automático</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
 
-        <tr>
-          <td style="background:#2c2c2c;padding:32px 40px;">
-            <p style="color:#c9a96e;font-size:11px;letter-spacing:4px;margin:0 0 6px;">ALMA STUDIO · SISTEMA</p>
-            <h1 style="color:#fff;font-size:22px;margin:0;font-weight:normal;">Recordatorio de horario</h1>
-          </td>
-        </tr>
-
-        <tr>
-          <td style="padding:36px 40px;">
-            <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px;">
-              El horario solo está cubierto hasta el <strong style="color:#2c2c2c;text-transform:capitalize;">${limitStr}</strong>
-              (<strong>${daysAhead} días</strong> desde hoy).
-            </p>
-            <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 28px;">
-              Recuerda subir al menos <strong>2 semanas</strong> de horario para que las alumnas puedan reservar con anticipación.
-            </p>
-
-            <table cellpadding="0" cellspacing="0" width="100%">
-              <tr><td align="center">
-                <a href="${appUrl}/admin/horario"
-                   style="display:inline-block;background:#c9a96e;color:#fff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:13px;letter-spacing:2px;text-transform:uppercase;font-family:Arial,sans-serif;">
-                  Ir al panel de horario
-                </a>
-              </td></tr>
-            </table>
-
-            <p style="color:#aaa;font-size:12px;text-align:center;margin:28px 0 0;">
-              Usa el botón "Auto-rellenar 2 sem." para completar rápidamente con las instructoras por defecto.
-            </p>
-          </td>
-        </tr>
-
-        <tr>
-          <td style="background:#f5f4f0;padding:20px 40px;text-align:center;">
-            <p style="color:#999;font-size:11px;margin:0;">Alma Studio · Sistema automático</p>
-          </td>
-        </tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>
-    `,
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: "Alma Studio Sistema <sistema@alma-studio.pe>",
+      to: adminEmail,
+      subject: `⚠ Horario incompleto — solo ${daysAhead} días cubiertos`,
+      html,
+    }),
   });
+
+  if (!res.ok) {
+    console.error("[schedule-reminder] Resend error:", await res.text());
+    return NextResponse.json({ ok: false, days_ahead: daysAhead });
+  }
 
   return NextResponse.json({ ok: true, days_ahead: daysAhead, action: "email_sent", to: adminEmail });
 }
