@@ -14,7 +14,7 @@ interface Instructor {
   instagram_handle: string | null;
   tagline: string | null;
   is_active: boolean;
-  profiles: { id: string; first_name: string; last_name: string; phone: string | null } | null;
+  profiles: { id: string; first_name: string; last_name: string; phone: string | null } | { id: string; first_name: string; last_name: string; phone: string | null }[] | null;
 }
 
 export default function InstructorasClient({ instructors: initial }: { instructors: Instructor[] }) {
@@ -62,9 +62,8 @@ export default function InstructorasClient({ instructors: initial }: { instructo
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {instructors.map((instructor) => {
-              const name = instructor.profiles
-                ? `${instructor.profiles.first_name} ${instructor.profiles.last_name}`
-                : "Sin nombre";
+              const profile = Array.isArray(instructor.profiles) ? instructor.profiles[0] : instructor.profiles;
+              const name = profile ? `${profile.first_name} ${profile.last_name}` : "Sin nombre";
               return (
                 <div key={instructor.id}
                   className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all ${instructor.is_active ? "border-stone-100" : "border-stone-200 opacity-60"}`}>

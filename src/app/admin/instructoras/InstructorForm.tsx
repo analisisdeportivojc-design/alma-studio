@@ -31,7 +31,8 @@ const SPECIALTIES_OPTIONS = [
 export default function InstructorForm({ instructor, onClose, onSaved }: Props) {
   const isEdit = !!instructor?.id;
 
-  const profile = instructor?.profiles || instructor;
+  const profileRaw = instructor?.profiles;
+  const profile = Array.isArray(profileRaw) ? profileRaw[0] : (profileRaw || instructor);
 
   const [form, setForm] = useState<InstructorData>({
     id: instructor?.id,
