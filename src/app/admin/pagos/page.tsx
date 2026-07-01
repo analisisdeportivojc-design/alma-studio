@@ -85,7 +85,7 @@ export default function AdminPagosPage() {
 
     const [clientsRes, packagesRes] = await Promise.all([
       fetch("/api/admin/clients"),
-      fetch("/api/packages?slug=alma-studio"),
+      fetch("/api/packages"),
     ]);
     const cd = await clientsRes.json();
     const pd = await packagesRes.json();
