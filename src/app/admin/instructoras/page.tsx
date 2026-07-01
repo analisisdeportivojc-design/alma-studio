@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import InstructorasClient from "./InstructorasClient";
 
 export default async function InstructorasPage() {
-  const supabase = await createClient();
-  const { data: business } = await supabase.from("businesses").select("id").limit(1).single();
+  const admin = createAdminClient();
+  const { data: business } = await admin.from("businesses").select("id").limit(1).single();
 
   const { data: instructors } = business
-    ? await supabase
+    ? await admin
         .from("instructors")
         .select("id, bio, specialties, photo_url, video_urls, instagram_handle, tagline, is_active, profiles(id, first_name, last_name, phone)")
         .eq("business_id", business.id)
