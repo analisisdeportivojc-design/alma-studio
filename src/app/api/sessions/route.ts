@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidDate, sanitizeString } from "@/lib/validation";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   // Get business
   const { data: business } = await supabase
@@ -45,8 +47,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Business not found" }, { status: 404 });
   }
 
-  // Get classes with instructor info
-  const { data: classes } = await supabase
+  // Get classes with instructor info (class template defaults)
+  const { data: classes } = await admin
     .from("classes")
     .select(`
       id,
@@ -60,18 +62,47 @@ export async function GET(request: Request) {
       instructor_id,
       disciplines(name),
       class_levels(name),
-      instructors(id, bio, photo_url, profiles(first_name, last_name))
+      instructors(id, photo_url, profiles(first_name, last_name))
     `)
     .eq("business_id", business.id)
     .eq("is_active", true);
 
-  // Get existing sessions for the date range (with instructor override)
-  const { data: existingSessions } = await supabase
+  // Get existing sessions for the date range
+  const { data: existingSessions } = await admin
     .from("class_sessions")
-    .select("id, class_id, session_date, status, instructor_id, instructors(id, photo_url, profiles(first_name, last_name))")
+    .select("id, class_id, session_date, status, instructor_id")
     .eq("business_id", business.id)
     .gte("session_date", startDate)
     .lte("session_date", endDate);
+
+  // Fetch instructor details for all assigned sessions (bypasses RLS on profiles)
+  const assignedInstructorIds = [
+    ...new Set(
+      (existingSessions || [])
+        .filter((s) => s.instructor_id)
+        .map((s) => s.instructor_id!)
+    ),
+  ];
+
+  const instructorMap: Record<string, { id: string; name: string; photo_url: string | null }> = {};
+
+  if (assignedInstructorIds.length > 0) {
+    const { data: instructors } = await admin
+      .from("instructors")
+      .select("id, photo_url, profiles(first_name, last_name)")
+      .in("id", assignedInstructorIds);
+
+    for (const inst of instructors || []) {
+      const profile = Array.isArray((inst as any).profiles)
+        ? (inst as any).profiles[0]
+        : (inst as any).profiles;
+      instructorMap[inst.id] = {
+        id: inst.id,
+        name: `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim(),
+        photo_url: inst.photo_url,
+      };
+    }
+  }
 
   // Get booking counts per session
   const sessionIds = (existingSessions || []).map((s) => s.id);
@@ -94,12 +125,12 @@ export async function GET(request: Request) {
   }
 
   // Generate sessions for each day in range
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = new Date(startDate + "T12:00:00");
+  const end = new Date(endDate + "T12:00:00");
   const sessions = [];
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1; // Convert to 0=Monday
+    const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1; // 0=Monday ... 6=Sunday
     const dateStr = d.toISOString().split("T")[0];
 
     const dayClasses = (classes || []).filter(
@@ -115,6 +146,20 @@ export async function GET(request: Request) {
         ? bookingCounts[existingSession.id] || 0
         : 0;
 
+      // Instructor: session override first, then class template default
+      let instructor: { id: string; name: string; photo_url: string | null } | null = null;
+
+      if (existingSession?.instructor_id && instructorMap[existingSession.instructor_id]) {
+        instructor = instructorMap[existingSession.instructor_id];
+      } else if ((cls.instructors as any)) {
+        const src = cls.instructors as any;
+        const profile = Array.isArray(src.profiles) ? src.profiles[0] : src.profiles;
+        const name = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim();
+        if (name || src.photo_url) {
+          instructor = { id: src.id, name, photo_url: src.photo_url };
+        }
+      }
+
       sessions.push({
         class_id: cls.id,
         session_id: existingSession?.id || null,
@@ -128,20 +173,7 @@ export async function GET(request: Request) {
         status: existingSession?.status || "scheduled",
         discipline: (cls.disciplines as any)?.name || null,
         level: (cls.class_levels as any)?.name || null,
-        instructor: (() => {
-            // Use session-level instructor override if assigned, else fall back to class template
-            const sessionInstructor = existingSession && (existingSession as any).instructors
-              ? (existingSession as any).instructors
-              : null;
-            const src = sessionInstructor || (cls.instructors as any) || null;
-            if (!src) return null;
-            const profile = Array.isArray(src.profiles) ? src.profiles[0] : src.profiles;
-            return {
-              id: src.id,
-              name: `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim(),
-              photo_url: src.photo_url,
-            };
-          })(),
+        instructor,
       });
     }
   }
