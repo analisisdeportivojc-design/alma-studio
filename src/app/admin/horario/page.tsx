@@ -77,6 +77,7 @@ export default function HorarioPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null); // class_id+date being saved
   const [assignModal, setAssignModal] = useState<{ cls: ClassTemplate; date: string } | null>(null);
   const [weekDates, setWeekDates] = useState<string[]>([]);
@@ -86,12 +87,22 @@ export default function HorarioPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/admin/schedule?week=${getWeekLabel(currentMonday)}`);
-    const data = await res.json();
-    setClasses(data.classes || []);
-    setSessions(data.sessions || []);
-    setInstructors(data.instructors || []);
-    setWeekDates(data.week?.dates || []);
+    setApiError(null);
+    try {
+      const res = await fetch(`/api/admin/schedule?week=${getWeekLabel(currentMonday)}`);
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setApiError(`Error API (${res.status}): ${data.error || "desconocido"}`);
+        setLoading(false);
+        return;
+      }
+      setClasses(data.classes || []);
+      setSessions(data.sessions || []);
+      setInstructors(data.instructors || []);
+      setWeekDates(data.week?.dates || []);
+    } catch (e: any) {
+      setApiError(`Error de red: ${e.message}`);
+    }
     setLoading(false);
   }, [currentMonday]);
 
@@ -214,6 +225,12 @@ export default function HorarioPage() {
           </button>
         </div>
       </div>
+
+      {apiError && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+          {apiError}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-64 text-stone-400">
