@@ -11,11 +11,13 @@ import {
   CreditCard,
   ArrowLeft,
   Star,
+  CalendarDays,
 } from "lucide-react";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/clases", label: "Clases", icon: Calendar },
+  { href: "/admin/horario", label: "Horario", icon: CalendarDays },
+  { href: "/admin/clases", label: "Plantillas", icon: Calendar },
   { href: "/admin/reservas", label: "Reservas", icon: CalendarCheck },
   { href: "/admin/clientes", label: "Clientes", icon: UserCircle },
   { href: "/admin/instructoras", label: "Instructoras", icon: Star },
