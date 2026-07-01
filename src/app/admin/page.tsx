@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { getUserRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   Users,
   Calendar,
@@ -9,6 +11,10 @@ import {
   Clock,
   AlertTriangle,
   Star,
+  Bell,
+  CheckCircle2,
+  CalendarDays,
+  Wand2,
 } from "lucide-react";
 
 async function getStats(businessId: string) {
@@ -138,6 +144,55 @@ async function getTopClasses(businessId: string) {
     .map(([name, count]) => ({ name, count }));
 }
 
+async function getScheduleHealth(businessId: string) {
+  const admin = createAdminClient();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split("T")[0];
+
+  const { data: classes } = await admin
+    .from("classes")
+    .select("id, day_of_week")
+    .eq("business_id", businessId)
+    .eq("is_active", true);
+
+  if (!classes?.length) return { days_ahead: 0, needs_action: false };
+
+  const futureEnd = new Date(today);
+  futureEnd.setDate(today.getDate() + 20);
+
+  const { data: sessions } = await admin
+    .from("class_sessions")
+    .select("class_id, session_date")
+    .eq("business_id", businessId)
+    .eq("status", "scheduled")
+    .gte("session_date", todayStr)
+    .lte("session_date", futureEnd.toISOString().split("T")[0]);
+
+  const existingKeys = new Set((sessions || []).map((s) => `${s.class_id}|${s.session_date}`));
+
+  let daysAhead = 0;
+  for (let i = 0; i < 20; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    const dateStr = d.toISOString().split("T")[0];
+    const dayClasses = classes.filter((c) => c.day_of_week === dayOfWeek);
+    if (dayClasses.length === 0) { daysAhead = i + 1; continue; }
+    if (!dayClasses.every((c) => existingKeys.has(`${c.id}|${dateStr}`))) break;
+    daysAhead = i + 1;
+  }
+
+  const limitDate = new Date(today);
+  limitDate.setDate(today.getDate() + daysAhead);
+
+  return {
+    days_ahead: daysAhead,
+    needs_action: daysAhead < 14,
+    limit_date: limitDate.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" }),
+  };
+}
+
 async function getRecentBookings(businessId: string) {
   const supabase = await createClient();
 
@@ -164,10 +219,11 @@ export default async function AdminDashboard() {
   const { businessId } = await getUserRole();
   if (!businessId) return null;
 
-  const [stats, topClasses, recentBookings] = await Promise.all([
+  const [stats, topClasses, recentBookings, scheduleHealth] = await Promise.all([
     getStats(businessId),
     getTopClasses(businessId),
     getRecentBookings(businessId),
+    getScheduleHealth(businessId),
   ]);
 
   const incomePct = pctChange(stats.incomeThisMonth, stats.incomeLastMonth);
@@ -189,6 +245,52 @@ export default async function AdminDashboard() {
             year: "numeric",
           })}
         </p>
+      </div>
+
+      {/* Tareas pendientes */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <Bell size={16} className="text-stone-400" />
+          <h2 className="text-sm font-bold uppercase tracking-wider text-stone-500">Tareas pendientes</h2>
+        </div>
+
+        <div className="space-y-3">
+          {/* Horario */}
+          {scheduleHealth.needs_action ? (
+            <div className="flex items-start gap-4 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+              <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                <CalendarDays size={18} className="text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-amber-900">
+                  El horario vence en {scheduleHealth.days_ahead} días
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Cubierto hasta el <span className="capitalize font-medium">{scheduleHealth.limit_date}</span>. Sube las próximas 2 semanas.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  href="/admin/horario"
+                  className="flex items-center gap-1.5 text-xs bg-amber-500 hover:bg-amber-400 text-white px-3 py-2 rounded-lg transition-colors font-medium"
+                >
+                  <Wand2 size={12} />
+                  Auto-rellenar
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 bg-green-50 border border-green-100 rounded-xl px-5 py-4">
+              <CheckCircle2 size={20} className="text-green-500 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-green-800">Horario al día</p>
+                <p className="text-xs text-green-600 mt-0.5">
+                  Cubierto por {scheduleHealth.days_ahead} días — próximo vencimiento el <span className="capitalize">{scheduleHealth.limit_date}</span>
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main stats */}
