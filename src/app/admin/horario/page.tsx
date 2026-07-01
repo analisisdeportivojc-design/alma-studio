@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Calendar, User, X, Check, AlertCircle, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, User, X, Check, AlertCircle, Loader2, Wand2 } from "lucide-react";
 
 const DAYS_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const MONTHS_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -81,6 +81,8 @@ export default function HorarioPage() {
   const [saving, setSaving] = useState<string | null>(null); // class_id+date being saved
   const [assignModal, setAssignModal] = useState<{ cls: ClassTemplate; date: string } | null>(null);
   const [weekDates, setWeekDates] = useState<string[]>([]);
+  const [autofilling, setAutofilling] = useState(false);
+  const [autofillMsg, setAutofillMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const weekLabel = getWeekLabel(currentMonday);
   const weekNum = getWeekNumber(currentMonday);
@@ -122,6 +124,21 @@ export default function HorarioPage() {
 
   function goToday() {
     setCurrentMonday(getMondayOfWeek(new Date()));
+  }
+
+  async function handleAutofill() {
+    setAutofilling(true);
+    setAutofillMsg(null);
+    const res = await fetch("/api/admin/schedule/autofill", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weeks: 2 }),
+    });
+    const data = await res.json();
+    setAutofilling(false);
+    setAutofillMsg({ text: data.message || (res.ok ? "Listo" : data.error), ok: res.ok });
+    if (res.ok) load();
+    setTimeout(() => setAutofillMsg(null), 5000);
   }
 
   function getSession(classId: string, date: string) {
@@ -228,8 +245,24 @@ export default function HorarioPage() {
             <Calendar size={13} />
             Hoy
           </button>
+
+          <button
+            onClick={handleAutofill}
+            disabled={autofilling}
+            className="flex items-center gap-1.5 px-4 py-2 bg-alma-gold text-white text-xs rounded-lg hover:bg-alma-gold/90 transition-colors disabled:opacity-50"
+            title="Crea sesiones para las próximas 2 semanas usando la instructora por defecto de cada clase"
+          >
+            {autofilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+            Auto-rellenar 2 sem.
+          </button>
         </div>
       </div>
+
+      {autofillMsg && (
+        <div className={`mb-4 px-4 py-3 rounded-xl text-sm ${autofillMsg.ok ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-600"}`}>
+          {autofillMsg.text}
+        </div>
+      )}
 
       {apiError && (
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
