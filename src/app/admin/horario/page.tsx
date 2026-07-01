@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Calendar, User, X, Check, AlertCircle, Loader2, Wand2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, User, X, Check, AlertCircle, Loader2, Wand2, RotateCcw } from "lucide-react";
 
 const DAYS_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const MONTHS_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -126,19 +126,20 @@ export default function HorarioPage() {
     setCurrentMonday(getMondayOfWeek(new Date()));
   }
 
-  async function handleAutofill() {
+  async function handleAutofill(reset = false) {
+    if (reset && !confirm("¿Limpiar y rellenar las próximas 2 semanas? Se borrarán las asignaciones sin reservas y se recrearán con las instructoras por defecto.")) return;
     setAutofilling(true);
     setAutofillMsg(null);
     const res = await fetch("/api/admin/schedule/autofill", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weeks: 2 }),
+      body: JSON.stringify({ weeks: 2, reset }),
     });
     const data = await res.json();
     setAutofilling(false);
     setAutofillMsg({ text: data.message || (res.ok ? "Listo" : data.error), ok: res.ok });
     if (res.ok) load();
-    setTimeout(() => setAutofillMsg(null), 5000);
+    setTimeout(() => setAutofillMsg(null), 6000);
   }
 
   function getSession(classId: string, date: string) {
@@ -247,13 +248,23 @@ export default function HorarioPage() {
           </button>
 
           <button
-            onClick={handleAutofill}
+            onClick={() => handleAutofill(false)}
             disabled={autofilling}
             className="flex items-center gap-1.5 px-4 py-2 bg-alma-gold text-white text-xs rounded-lg hover:bg-alma-gold/90 transition-colors disabled:opacity-50"
             title="Crea sesiones para las próximas 2 semanas usando la instructora por defecto de cada clase"
           >
             {autofilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
             Auto-rellenar 2 sem.
+          </button>
+
+          <button
+            onClick={() => handleAutofill(true)}
+            disabled={autofilling}
+            className="flex items-center gap-1.5 px-4 py-2 bg-white border border-stone-200 text-stone-500 text-xs rounded-lg hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors disabled:opacity-50"
+            title="Borra las sesiones sin reservas y las recrea desde cero con las instructoras por defecto"
+          >
+            <RotateCcw size={13} />
+            Limpiar y rellenar
           </button>
         </div>
       </div>

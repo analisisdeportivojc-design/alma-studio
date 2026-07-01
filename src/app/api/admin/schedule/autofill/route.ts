@@ -3,18 +3,46 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserRole, canAccessAdmin } from "@/lib/auth";
 
 // POST /api/admin/schedule/autofill
-// - Crea sesiones nuevas que falten
-// - Rellena instructor_id en sesiones existentes que lo tengan vacío (sin tocar las asignadas manualmente)
+// reset=false → crea sesiones nuevas y rellena instructor_id vacíos
+// reset=true  → borra sesiones sin reservas y las recrea desde cero con instructoras por defecto
 export async function POST(req: NextRequest) {
   const { role } = await getUserRole();
   if (!canAccessAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const admin = createAdminClient();
-  const { weeks = 2 } = await req.json().catch(() => ({}));
+  const { weeks = 2, reset = false } = await req.json().catch(() => ({}));
   const days = Math.min(weeks * 7, 28);
 
   const { data: business } = await admin.from("businesses").select("id").limit(1).single();
   if (!business) return NextResponse.json({ error: "No business" }, { status: 400 });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const endDate = new Date(today);
+  endDate.setDate(today.getDate() + days - 1);
+  const startStr = today.toISOString().split("T")[0];
+  const endStr = endDate.toISOString().split("T")[0];
+
+  // Si reset=true: elimina sesiones sin reservas activas antes de rellenar
+  if (reset) {
+    const { data: bookedSessions } = await admin
+      .from("bookings")
+      .select("session_id")
+      .in("status", ["confirmed", "waitlist", "attended"]);
+    const bookedIds = new Set((bookedSessions || []).map((b) => b.session_id).filter(Boolean));
+
+    const { data: toDeleteList } = await admin
+      .from("class_sessions")
+      .select("id")
+      .eq("business_id", business.id)
+      .gte("session_date", startStr)
+      .lte("session_date", endStr);
+
+    const deletableIds = (toDeleteList || []).map((s) => s.id).filter((id) => !bookedIds.has(id));
+    if (deletableIds.length > 0) {
+      await admin.from("class_sessions").delete().in("id", deletableIds);
+    }
+  }
 
   const { data: classes } = await admin
     .from("classes")
@@ -24,14 +52,7 @@ export async function POST(req: NextRequest) {
 
   if (!classes?.length) return NextResponse.json({ created: 0, updated: 0, message: "No hay clases activas" });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endDate = new Date(today);
-  endDate.setDate(today.getDate() + days - 1);
-  const startStr = today.toISOString().split("T")[0];
-  const endStr = endDate.toISOString().split("T")[0];
-
-  // Sesiones existentes en ese rango (con su instructor_id actual)
+  // Sesiones existentes tras el posible reset
   const { data: existing } = await admin
     .from("class_sessions")
     .select("id, class_id, session_date, instructor_id")
@@ -57,7 +78,6 @@ export async function POST(req: NextRequest) {
       const existingSession = existingMap.get(key);
 
       if (!existingSession) {
-        // Crear sesión nueva
         toInsert.push({
           class_id: cls.id,
           business_id: business.id,
@@ -66,10 +86,8 @@ export async function POST(req: NextRequest) {
           status: "scheduled",
         });
       } else if (!existingSession.instructor_id && cls.instructor_id) {
-        // Sesión existe pero sin instructora → rellenar con la por defecto
         toUpdate.push({ id: existingSession.id, instructor_id: cls.instructor_id });
       }
-      // Si ya tiene instructora asignada manualmente → no tocar
     }
   }
 
@@ -82,12 +100,8 @@ export async function POST(req: NextRequest) {
     created = toInsert.length;
   }
 
-  // Actualizar sesiones sin instructora en lotes
   for (const row of toUpdate) {
-    await admin
-      .from("class_sessions")
-      .update({ instructor_id: row.instructor_id })
-      .eq("id", row.id);
+    await admin.from("class_sessions").update({ instructor_id: row.instructor_id }).eq("id", row.id);
     updated++;
   }
 
@@ -99,6 +113,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     created,
     updated,
-    message: `✓ ${created > 0 ? `${created} sesiones creadas` : ""}${created > 0 && updated > 0 ? " · " : ""}${updated > 0 ? `${updated} instructoras asignadas` : ""}`,
+    message: `✓ ${[created > 0 ? `${created} sesiones creadas` : "", updated > 0 ? `${updated} instructoras asignadas` : ""].filter(Boolean).join(" · ")}`,
   });
 }
