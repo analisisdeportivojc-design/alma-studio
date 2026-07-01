@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Clock, Users, Star, Instagram, ChevronRight } from "lucide-react";
+import { X, Clock, Users, Star, AtSign, ChevronRight } from "lucide-react";
 
 interface Session {
   class_id: string;
@@ -197,7 +197,7 @@ export default function SessionDetailPanel({ session, businessId, myBooking, onC
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 text-xs text-stone-400 hover:text-alma-warm mt-1 transition-colors"
                     >
-                      <Instagram size={12} />
+                      <AtSign size={12} />
                       {instructor.instagram_handle}
                     </a>
                   )}
