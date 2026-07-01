@@ -15,7 +15,7 @@ export async function GET() {
     .from("instructors")
     .select("id, bio, specialties, photo_url, video_urls, instagram_handle, tagline, is_active, profiles(id, first_name, last_name, phone)")
     .eq("business_id", business.id)
-    .order("created_at", { ascending: true });
+    .order("id", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ instructors: data });
