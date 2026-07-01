@@ -2,23 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserRole, canAccessAdmin } from "@/lib/auth";
 
-// GET /api/admin/schedule?week=2026-W27
-// Returns all class templates for the business + their sessions for the given week
 export async function GET(req: NextRequest) {
   const { role } = await getUserRole();
   if (!canAccessAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);
-  const weekParam = searchParams.get("week"); // e.g. "2026-W27"
+  const weekParam = searchParams.get("week");
 
   const admin = createAdminClient();
   const { data: business } = await admin.from("businesses").select("id").limit(1).single();
   if (!business) return NextResponse.json({ error: "No business" }, { status: 400 });
 
-  // Parse week → get Mon-Sun dates
   const { monday, sunday, dates } = parseWeek(weekParam);
 
-  // Get all active class templates
   const { data: classes, error: classesError } = await admin
     .from("classes")
     .select("*")
@@ -29,15 +25,13 @@ export async function GET(req: NextRequest) {
 
   if (classesError) return NextResponse.json({ error: `classes: ${classesError.message}` }, { status: 500 });
 
-  // Get sessions for this week
   const { data: sessions } = await admin
     .from("class_sessions")
-    .select("id, class_id, date, instructor_id, status, notes, instructors(id, photo_url, tagline, profiles(first_name, last_name))")
+    .select("id, class_id, session_date, instructor_id, status, notes, instructors(id, photo_url, tagline, profiles(first_name, last_name))")
     .eq("business_id", business.id)
-    .gte("date", monday)
-    .lte("date", sunday);
+    .gte("session_date", monday)
+    .lte("session_date", sunday);
 
-  // Get all active instructors
   const { data: instructors } = await admin
     .from("instructors")
     .select("id, photo_url, tagline, is_active, profiles(first_name, last_name)")
@@ -49,11 +43,10 @@ export async function GET(req: NextRequest) {
     classes: classes || [],
     sessions: sessions || [],
     instructors: instructors || [],
-    week: { monday, sunday, dates, label: weekParam || getWeekLabel(new Date()) },
+    week: { monday, sunday, dates },
   });
 }
 
-// POST /api/admin/schedule — upsert a session (assign instructor to a class on a date)
 export async function POST(req: NextRequest) {
   const { role } = await getUserRole();
   if (!canAccessAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -69,13 +62,13 @@ export async function POST(req: NextRequest) {
     .upsert(
       {
         class_id,
-        date,
+        session_date: date,
         business_id: business.id,
         instructor_id: instructor_id || null,
         status: status || "scheduled",
         notes: notes || null,
       },
-      { onConflict: "class_id,date" }
+      { onConflict: "class_id,session_date" }
     )
     .select()
     .single();
@@ -84,7 +77,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ session: data });
 }
 
-// DELETE /api/admin/schedule?class_id=x&date=2026-07-07
 export async function DELETE(req: NextRequest) {
   const { role } = await getUserRole();
   if (!canAccessAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -98,24 +90,21 @@ export async function DELETE(req: NextRequest) {
     .from("class_sessions")
     .delete()
     .eq("class_id", class_id!)
-    .eq("date", date!);
+    .eq("session_date", date!);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseWeek(weekParam: string | null): { monday: string; sunday: string; dates: string[] } {
   let monday: Date;
 
   if (weekParam && /^\d{4}-W\d{2}$/.test(weekParam)) {
     const [year, weekStr] = weekParam.split("-W");
-    const week = parseInt(weekStr);
-    // ISO week: week 1 = week containing first Thursday of year
-    monday = getMonday(parseInt(year), week);
+    monday = getMonday(parseInt(year), parseInt(weekStr));
   } else {
-    // Current week
     const today = new Date();
     monday = new Date(today);
     const day = today.getDay();
@@ -148,13 +137,4 @@ function getMonday(year: number, week: number): Date {
   const monday = new Date(startOfWeek1);
   monday.setDate(startOfWeek1.getDate() + (week - 1) * 7);
   return monday;
-}
-
-function getWeekLabel(date: Date): string {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const week1 = new Date(d.getFullYear(), 0, 4);
-  const weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
-  return `${d.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
 }

@@ -20,7 +20,7 @@ interface ClassTemplate {
 interface Session {
   id: string;
   class_id: string;
-  date: string;
+  session_date: string;
   instructor_id: string | null;
   status: string;
   notes: string | null;
@@ -125,7 +125,7 @@ export default function HorarioPage() {
   }
 
   function getSession(classId: string, date: string) {
-    return sessions.find((s) => s.class_id === classId && s.date === date) || null;
+    return sessions.find((s) => s.class_id === classId && s.session_date === date) || null;
   }
 
   async function assignInstructor(cls: ClassTemplate, date: string, instructorId: string | null) {
