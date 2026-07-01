@@ -46,11 +46,12 @@ export async function POST(req: NextRequest) {
 
   const userId = authData.user.id;
 
-  await supabase.from("profiles").upsert({ id: userId, first_name, last_name, phone: phone || null });
+  // Usar admin client para saltarse RLS en operaciones de creación de staff
+  await admin.from("profiles").upsert({ id: userId, first_name, last_name, phone: phone || null });
 
-  await supabase.from("memberships").insert({ user_id: userId, business_id: business.id, role: "instructor" });
+  await admin.from("memberships").insert({ user_id: userId, business_id: business.id, role: "instructor" });
 
-  const { data: instructor, error: instrError } = await supabase
+  const { data: instructor, error: instrError } = await admin
     .from("instructors")
     .insert({
       user_id: userId,
